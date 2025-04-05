@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -342,8 +343,16 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
 
 // Wrap the component with RoomProvider
 const SpreadsheetEditor = ({ sheetId }: SpreadsheetEditorProps) => {
-  // Create an instance of LiveMap to use in initialStorage
-  const initialSheetsMap = new LiveMap();
+  // Create a properly typed LiveMap instance with the expected structure
+  const initialSheetsMap = new LiveMap<
+    string, 
+    LiveObject<{
+      name: string;
+      data: LiveList<LiveList<string>>;
+      columns: number;
+      rows: number;
+    }>
+  >();
   
   return (
     <LiveblocksRoomProvider
