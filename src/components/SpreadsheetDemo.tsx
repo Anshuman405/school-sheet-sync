@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   UserRound, 
@@ -20,7 +20,7 @@ export default function SpreadsheetDemo() {
   );
   
   // Initial row with example data
-  useState(() => {
+  useEffect(() => {
     const initialData = [...data];
     initialData[0][0] = "Student";
     initialData[0][1] = "Math";
