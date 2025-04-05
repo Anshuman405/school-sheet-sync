@@ -29,7 +29,8 @@ import {
   PlusSquare,
   Scissors,
   Copy,
-  Clipboard
+  Clipboard,
+  MinusSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,7 +55,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Mock data for initial sheets
 const mockSheetData = {
@@ -77,8 +82,8 @@ const mockSheetData = {
       ["", "", "", "", ""],
       ["", "", "", "", ""],
     ],
-    columns: 20,
-    rows: 50,
+    columns: 50,
+    rows: 100,
   },
   "2": {
     name: "School Budget Q2",
@@ -99,26 +104,27 @@ const mockSheetData = {
       ["", "", "", "", ""],
       ["", "", "", "", ""],
     ],
-    columns: 20,
-    rows: 50,
+    columns: 50,
+    rows: 100,
   },
 };
 
 interface SpreadsheetEditorProps {
   sheetId: string;
+  initialSheetName?: string;
 }
 
-const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
+const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEditorProps) => {
   const navigate = useNavigate();
   const { user } = useUser();
   const room = useRoom();
   const others = useOthers();
-  const [sheetName, setSheetName] = useState("");
+  const [sheetName, setSheetName] = useState(initialSheetName || "Untitled Sheet");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempSheetName, setTempSheetName] = useState("");
   const [data, setData] = useState<string[][]>([]);
-  const [columns, setColumns] = useState(20);
-  const [rows, setRows] = useState(50);
+  const [columns, setColumns] = useState(50);
+  const [rows, setRows] = useState(100);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -131,7 +137,9 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
     align: 'left'
   });
   const [cellFormats, setCellFormats] = useState<Record<string, { bold: boolean; align: string }>>({});
+  const [isCopying, setIsCopying] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const spreadsheetTableRef = useRef<HTMLTableElement>(null);
   
   // Initialize with mock data or from Liveblocks storage
   useEffect(() => {
@@ -142,8 +150,12 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
         // In a real app, we would load data from Liveblocks or another storage
         if (mockSheetData[sheetId as keyof typeof mockSheetData]) {
           const sheet = mockSheetData[sheetId as keyof typeof mockSheetData];
-          setSheetName(sheet.name);
-          setTempSheetName(sheet.name);
+          if (!initialSheetName) {
+            setSheetName(sheet.name);
+            setTempSheetName(sheet.name);
+          } else {
+            setTempSheetName(initialSheetName);
+          }
           
           // Ensure data has enough rows and columns
           const initialData = sheet.data.slice();
@@ -168,14 +180,11 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
           setRows(sheet.rows);
         } else if (sheetId.startsWith("new-")) {
           // New sheet
-          setSheetName("Untitled Sheet");
-          setTempSheetName("Untitled Sheet");
+          setTempSheetName(initialSheetName || "Untitled Sheet");
           
           // Create a larger initial grid
-          const initialData = Array(50).fill(null).map(() => Array(20).fill(""));
+          const initialData = Array(rows).fill(null).map(() => Array(columns).fill(""));
           setData(initialData);
-          setColumns(20);
-          setRows(50);
         }
       } catch (error) {
         console.error("Error loading sheet:", error);
@@ -190,7 +199,7 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
     };
     
     initializeSheet();
-  }, [sheetId]);
+  }, [sheetId, initialSheetName, columns, rows]);
   
   // Handle cell changes
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
@@ -278,10 +287,20 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
   
   // Add a new row
   const handleAddRow = () => {
-    const newData = [...data];
-    newData.push(Array(columns).fill(""));
-    setData(newData);
-    setRows(rows + 1);
+    if (selectedCells) {
+      // Insert a row after the last selected row
+      const rowIndex = Math.max(selectedCells.startRow, selectedCells.endRow);
+      const newData = [...data];
+      newData.splice(rowIndex + 1, 0, Array(columns).fill(""));
+      setData(newData);
+      setRows(rows + 1);
+    } else {
+      // Just add at the end
+      const newData = [...data];
+      newData.push(Array(columns).fill(""));
+      setData(newData);
+      setRows(rows + 1);
+    }
     
     toast({
       title: "Row added",
@@ -289,20 +308,83 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
     });
   };
   
+  // Remove a row
+  const handleRemoveRow = () => {
+    if (!selectedCells) {
+      toast({
+        title: "Selection required",
+        description: "Please select a row to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const rowIndex = Math.max(selectedCells.startRow, selectedCells.endRow);
+    const newData = [...data];
+    newData.splice(rowIndex, 1);
+    setData(newData);
+    setRows(rows - 1);
+    setSelectedCells(null);
+    
+    toast({
+      title: "Row removed",
+      description: "The selected row has been removed.",
+    });
+  };
+  
   // Add a new column
   const handleAddColumn = () => {
-    const newData = data.map(row => {
-      const newRow = [...row];
-      newRow.push("");
-      return newRow;
-    });
-    
-    setData(newData);
-    setColumns(columns + 1);
+    if (selectedCells) {
+      // Insert a column after the last selected column
+      const colIndex = Math.max(selectedCells.startCol, selectedCells.endCol);
+      const newData = data.map(row => {
+        const newRow = [...row];
+        newRow.splice(colIndex + 1, 0, "");
+        return newRow;
+      });
+      setData(newData);
+      setColumns(columns + 1);
+    } else {
+      // Just add at the end
+      const newData = data.map(row => {
+        const newRow = [...row];
+        newRow.push("");
+        return newRow;
+      });
+      setData(newData);
+      setColumns(columns + 1);
+    }
     
     toast({
       title: "Column added",
       description: "A new column has been added to the sheet.",
+    });
+  };
+  
+  // Remove a column
+  const handleRemoveColumn = () => {
+    if (!selectedCells) {
+      toast({
+        title: "Selection required",
+        description: "Please select a column to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const colIndex = Math.max(selectedCells.startCol, selectedCells.endCol);
+    const newData = data.map(row => {
+      const newRow = [...row];
+      newRow.splice(colIndex, 1);
+      return newRow;
+    });
+    setData(newData);
+    setColumns(columns - 1);
+    setSelectedCells(null);
+    
+    toast({
+      title: "Column removed",
+      description: "The selected column has been removed.",
     });
   };
   
@@ -364,6 +446,15 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
   
   const handleCellMouseUp = () => {
     // Keep the selection active, but stop tracking mouse movement
+    if (selectedCells) {
+      // Update the active cell format based on the last selected cell
+      const cellKey = `${selectedCells.endRow}-${selectedCells.endCol}`;
+      const format = cellFormats[cellKey] || { bold: false, align: 'left' };
+      setActiveCellFormat({
+        bold: format.bold,
+        align: format.align as 'left' | 'center' | 'right'
+      });
+    }
   };
   
   // Check if a cell is in the selected range
@@ -448,6 +539,7 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
         title: "Copied!",
         description: "Selected cells copied to clipboard.",
       });
+      setIsCopying(true); // Enable paste mode
     }).catch(err => {
       console.error('Failed to copy: ', err);
       toast({
@@ -458,14 +550,114 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
     });
   };
   
+  // Paste from clipboard
+  const handlePaste = async () => {
+    try {
+      if (!selectedCells) return;
+      
+      const clipboardText = await navigator.clipboard.readText();
+      const pasteRows = clipboardText.split('\n').filter(row => row.trim() !== '');
+      
+      if (pasteRows.length === 0) return;
+      
+      const targetRow = selectedCells.startRow;
+      const targetCol = selectedCells.startCol;
+      
+      const newData = [...data];
+      
+      pasteRows.forEach((rowText, rowOffset) => {
+        const rowCells = rowText.split('\t');
+        rowCells.forEach((cellValue, colOffset) => {
+          const pasteRowIdx = targetRow + rowOffset;
+          const pasteColIdx = targetCol + colOffset;
+          
+          if (pasteRowIdx < rows && pasteColIdx < columns) {
+            if (!newData[pasteRowIdx]) {
+              newData[pasteRowIdx] = Array(columns).fill('');
+            }
+            newData[pasteRowIdx][pasteColIdx] = cellValue;
+          }
+        });
+      });
+      
+      setData(newData);
+      setIsCopying(false);
+      
+      toast({
+        title: "Pasted!",
+        description: "Content pasted successfully.",
+      });
+    } catch (err) {
+      console.error('Failed to paste: ', err);
+      toast({
+        title: "Error",
+        description: "Failed to paste from clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Handle keyboard events
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setSelectedCells(null);
+      setIsCopying(false);
     } else if (e.ctrlKey && e.key === 'c') {
       handleCopy();
+    } else if (e.ctrlKey && e.key === 'v') {
+      handlePaste();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selectedCells) {
+        const minRow = Math.min(selectedCells.startRow, selectedCells.endRow);
+        const maxRow = Math.max(selectedCells.startRow, selectedCells.endRow);
+        const minCol = Math.min(selectedCells.startCol, selectedCells.endCol);
+        const maxCol = Math.max(selectedCells.startCol, selectedCells.endCol);
+        
+        const newData = [...data];
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            if (newData[r] && newData[r][c] !== undefined) {
+              newData[r][c] = '';
+            }
+          }
+        }
+        
+        setData(newData);
+        toast({
+          title: "Cells cleared",
+          description: "Selected cells have been cleared.",
+        });
+      }
     }
   };
+  
+  // Scroll to make sure selection is visible
+  useEffect(() => {
+    if (selectedCells && spreadsheetTableRef.current) {
+      const table = spreadsheetTableRef.current;
+      const tableRect = table.getBoundingClientRect();
+      
+      // Try to find the selected cell
+      const selectedCell = table.querySelector(`td[data-row="${selectedCells.endRow}"][data-col="${selectedCells.endCol}"]`);
+      
+      if (selectedCell) {
+        const cellRect = selectedCell.getBoundingClientRect();
+        
+        // Check if cell is outside view
+        if (cellRect.right > tableRect.right) {
+          table.parentElement?.scrollBy({ left: cellRect.right - tableRect.right + 50, behavior: 'smooth' });
+        } else if (cellRect.left < tableRect.left) {
+          table.parentElement?.scrollBy({ left: cellRect.left - tableRect.left - 50, behavior: 'smooth' });
+        }
+        
+        if (cellRect.bottom > tableRect.bottom) {
+          table.parentElement?.scrollBy({ top: cellRect.bottom - tableRect.bottom + 50, behavior: 'smooth' });
+        } else if (cellRect.top < tableRect.top) {
+          table.parentElement?.scrollBy({ top: cellRect.top - tableRect.top - 50, behavior: 'smooth' });
+        }
+      }
+    }
+  }, [selectedCells]);
   
   if (isLoading) {
     return (
@@ -542,12 +734,42 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
       </div>
       
       <div className="p-3 border-b bg-muted/30 flex flex-wrap gap-2 rounded-t-lg border-t border-x">
-        <Button size="sm" variant="outline" className="h-8" onClick={handleAddRow}>
-          <Plus size={16} className="mr-1" /> Add Row
-        </Button>
-        <Button size="sm" variant="outline" className="h-8" onClick={handleAddColumn}>
-          <Plus size={16} className="mr-1" /> Add Column
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline" className="h-8">
+              <Plus size={16} className="mr-1" /> Add <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-0" align="start">
+            <div className="flex flex-col">
+              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={handleAddRow}>
+                <Plus size={14} className="mr-2" /> Add Row
+              </Button>
+              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={handleAddColumn}>
+                <Plus size={14} className="mr-2" /> Add Column
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline" className="h-8">
+              <Trash2 size={16} className="mr-1" /> Remove <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-0" align="start">
+            <div className="flex flex-col">
+              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={handleRemoveRow}>
+                <MinusSquare size={14} className="mr-2" /> Remove Row
+              </Button>
+              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={handleRemoveColumn}>
+                <MinusSquare size={14} className="mr-2" /> Remove Column
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+        
         <Separator orientation="vertical" className="h-8" />
         
         <Button 
@@ -590,6 +812,11 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
             <Button size="sm" variant="outline" className="h-8" onClick={handleCopy}>
               <Copy size={16} className="mr-1" /> Copy
             </Button>
+            {isCopying && (
+              <Button size="sm" variant="outline" className="h-8" onClick={handlePaste}>
+                <Clipboard size={16} className="mr-1" /> Paste
+              </Button>
+            )}
           </>
         )}
         
@@ -650,77 +877,3 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
       
       <div className="rounded-b-lg border overflow-auto h-[calc(100vh-220px)]">
         <div className="min-w-max">
-          <table className="w-full spreadsheet-grid">
-            <thead className="sticky top-0 z-10 bg-secondary/50">
-              <tr>
-                <th className="spreadsheet-header w-10 bg-secondary/50 sticky left-0 z-20">#</th>
-                {Array(columns).fill(null).map((_, colIndex) => (
-                  <th key={colIndex} className="spreadsheet-header min-w-[100px]">
-                    {getColumnLabel(colIndex)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array(rows).fill(null).map((_, rowIndex) => (
-                <tr key={rowIndex}>
-                  <td className="spreadsheet-row-header sticky left-0 z-10 bg-secondary/50">{rowIndex + 1}</td>
-                  {Array(columns).fill(null).map((_, colIndex) => (
-                    <td 
-                      key={colIndex} 
-                      className={`min-w-[100px] relative ${isCellSelected(rowIndex, colIndex) ? 'bg-primary/10 border-primary' : ''}`}
-                      onMouseDown={() => handleCellMouseDown(rowIndex, colIndex)}
-                      onMouseOver={() => handleCellMouseOver(rowIndex, colIndex)}
-                      onMouseUp={handleCellMouseUp}
-                    >
-                      <input
-                        type="text"
-                        value={data[rowIndex]?.[colIndex] || ""}
-                        onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)}
-                        className="spreadsheet-cell w-full bg-transparent outline-none"
-                        style={getCellStyle(rowIndex, colIndex) as React.CSSProperties}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Wrap the component with RoomProvider
-const SpreadsheetEditor = ({ sheetId }: SpreadsheetEditorProps) => {
-  // Create a properly typed LiveMap instance with the expected structure
-  const initialSheetsMap = new LiveMap<
-    string, 
-    LiveObject<{
-      name: string;
-      data: LiveList<LiveList<string>>;
-      columns: number;
-      rows: number;
-    }>
-  >();
-  
-  return (
-    <LiveblocksRoomProvider
-      id={`sheet-${sheetId}`}
-      initialPresence={{
-        firstName: "",
-        lastName: "",
-        cursor: null,
-      }}
-      initialStorage={{
-        sheets: initialSheetsMap
-      }}
-    >
-      <SpreadsheetEditorContent sheetId={sheetId} />
-    </LiveblocksRoomProvider>
-  );
-};
-
-export default SpreadsheetEditor;

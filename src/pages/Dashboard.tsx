@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -10,7 +10,10 @@ import {
   Grid, 
   Users,
   Clock,
-  Star
+  Star,
+  Trash2,
+  Edit,
+  ListFilter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +27,37 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 import SpreadsheetEditor from "@/components/SpreadsheetEditor";
 
 // Mock data for sheets
-const mockSheets = [
+const initialMockSheets = [
   { id: "1", name: "Class 10B Grades", updatedAt: "2023-04-01T10:30:00Z", shared: true, starred: true },
   { id: "2", name: "School Budget Q2", updatedAt: "2023-03-28T14:15:00Z", shared: true, starred: false },
   { id: "3", name: "Student Attendance Log", updatedAt: "2023-03-25T09:45:00Z", shared: false, starred: true },
@@ -40,6 +70,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { id: sheetId } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [mockSheets, setMockSheets] = useState(initialMockSheets);
+  const [sheetToRename, setSheetToRename] = useState<{ id: string, name: string } | null>(null);
+  const [newSheetName, setNewSheetName] = useState("");
+  const [sheetToDelete, setSheetToDelete] = useState<string | null>(null);
   
   // Filter sheets based on search query
   const filteredSheets = mockSheets.filter(sheet => 
@@ -65,10 +100,131 @@ const Dashboard = () => {
   };
   
   const createNewSheet = () => {
-    // In a real app, this would create a new sheet in the database
-    // and redirect to it with the new ID
-    navigate(`/sheets/new-${Date.now()}`);
+    const newId = `new-${Date.now()}`;
+    const newSheet = {
+      id: newId,
+      name: "Untitled Sheet",
+      updatedAt: new Date().toISOString(),
+      shared: false,
+      starred: false
+    };
+    
+    setMockSheets([newSheet, ...mockSheets]);
+    navigate(`/sheets/${newId}`);
+    
+    toast({
+      title: "New sheet created",
+      description: "Your new spreadsheet is ready to edit.",
+    });
   };
+  
+  const handleDeleteSheet = (id: string) => {
+    setMockSheets(mockSheets.filter(sheet => sheet.id !== id));
+    setSheetToDelete(null);
+    
+    toast({
+      title: "Sheet deleted",
+      description: "The sheet has been permanently deleted.",
+    });
+  };
+  
+  const handleRenameSheet = () => {
+    if (!sheetToRename) return;
+    
+    if (newSheetName.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Sheet name cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setMockSheets(mockSheets.map(sheet => 
+      sheet.id === sheetToRename.id 
+        ? { ...sheet, name: newSheetName } 
+        : sheet
+    ));
+    
+    setSheetToRename(null);
+    setNewSheetName("");
+    
+    toast({
+      title: "Sheet renamed",
+      description: "The sheet has been renamed successfully.",
+    });
+  };
+  
+  const toggleStarred = (id: string) => {
+    setMockSheets(mockSheets.map(sheet => 
+      sheet.id === id 
+        ? { ...sheet, starred: !sheet.starred } 
+        : sheet
+    ));
+  };
+  
+  const SheetItemActions = ({ sheet }: { sheet: typeof mockSheets[0] }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Button variant="ghost" size="icon">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            setSheetToRename({ id: sheet.id, name: sheet.name });
+            setNewSheetName(sheet.name);
+          }}
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleStarred(sheet.id);
+          }}
+        >
+          <Star className={`h-4 w-4 mr-2 ${sheet.starred ? "text-yellow-400" : ""}`} />
+          {sheet.starred ? "Unstar" : "Star"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            setSheetToDelete(sheet.id);
+          }}
+          className="text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  
+  // Save sheet updates when leaving
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // This would be where we save any changes to the backend
+      // For now we'll just update the mock data's updatedAt timestamp
+      if (sheetId) {
+        setMockSheets(mockSheets.map(sheet => 
+          sheet.id === sheetId 
+            ? { ...sheet, updatedAt: new Date().toISOString() } 
+            : sheet
+        ));
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload(); // Run on component unmount too
+    };
+  }, [sheetId, mockSheets]);
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -101,9 +257,39 @@ const Dashboard = () => {
             <Button onClick={createNewSheet} size="sm">
               <Plus className="mr-1 h-4 w-4" /> New Sheet
             </Button>
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-              {user?.firstName?.charAt(0) || user?.username?.charAt(0) || "U"}
-            </div>
+            
+            {/* User dropdown from Clerk */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                    {user?.firstName?.charAt(0) || user?.username?.charAt(0) || "U"}
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem className="font-medium">
+                  {user?.firstName} {user?.lastName}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-sm text-muted-foreground">
+                  {user?.primaryEmailAddress?.emailAddress}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/account")}>
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => {
+                    // Sign out handled by Clerk's SignOutButton component
+                    navigate("/");
+                  }}
+                  className="text-destructive"
+                >
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -111,15 +297,33 @@ const Dashboard = () => {
       <main className="flex-1 container py-6">
         {sheetId ? (
           // Show spreadsheet editor when a sheet is selected
-          <SpreadsheetEditor sheetId={sheetId} />
+          <SpreadsheetEditor 
+            sheetId={sheetId} 
+            initialSheetName={mockSheets.find(s => s.id === sheetId)?.name || "Untitled Sheet"}
+          />
         ) : (
           // Show dashboard with sheets list
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold tracking-tight">Your Sheets</h1>
-              <Button variant="outline" size="sm">
-                <Grid className="mr-1 h-4 w-4" /> View Options
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === "list" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                >
+                  <ListFilter className="h-4 w-4 mr-2" />
+                  List
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <Grid className="h-4 w-4 mr-2" />
+                  Grid
+                </Button>
+              </div>
             </div>
             
             <Tabs defaultValue="recent" className="space-y-6">
@@ -135,114 +339,335 @@ const Dashboard = () => {
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="recent" className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[400px]">Name</TableHead>
-                      <TableHead>Last Modified</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSheets.map((sheet) => (
-                      <TableRow 
-                        key={sheet.id}
-                        className="cursor-pointer"
-                        onClick={() => navigate(`/sheets/${sheet.id}`)}
-                      >
-                        <TableCell className="font-medium">
-                          <div className="flex items-center">
-                            <File className="mr-2 h-4 w-4 text-muted-foreground" />
-                            {sheet.name}
-                            {sheet.starred && <Star className="ml-2 h-4 w-4 text-yellow-400" />}
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-              
-              <TabsContent value="starred" className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[400px]">Name</TableHead>
-                      <TableHead>Last Modified</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSheets
-                      .filter(sheet => sheet.starred)
-                      .map((sheet) => (
-                        <TableRow 
-                          key={sheet.id}
-                          className="cursor-pointer"
+              {viewMode === "list" ? (
+                <>
+                  <TabsContent value="recent" className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[400px]">Name</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSheets.map((sheet) => (
+                          <TableRow 
+                            key={sheet.id}
+                            className="cursor-pointer"
+                            onClick={() => navigate(`/sheets/${sheet.id}`)}
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center">
+                                <File className="mr-2 h-4 w-4 text-muted-foreground" />
+                                {sheet.name}
+                                {sheet.starred && <Star className="ml-2 h-4 w-4 text-yellow-400" />}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <SheetItemActions sheet={sheet} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {filteredSheets.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                              No sheets found. Create a new sheet to get started.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="starred" className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[400px]">Name</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSheets
+                          .filter(sheet => sheet.starred)
+                          .map((sheet) => (
+                            <TableRow 
+                              key={sheet.id}
+                              className="cursor-pointer"
+                              onClick={() => navigate(`/sheets/${sheet.id}`)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center">
+                                  <File className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  {sheet.name}
+                                  <Star className="ml-2 h-4 w-4 text-yellow-400" />
+                                </div>
+                              </TableCell>
+                              <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
+                              <TableCell className="text-right">
+                                <SheetItemActions sheet={sheet} />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        {filteredSheets.filter(sheet => sheet.starred).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                              No starred sheets. Star a sheet to add it to this list.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="shared" className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[400px]">Name</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSheets
+                          .filter(sheet => sheet.shared)
+                          .map((sheet) => (
+                            <TableRow 
+                              key={sheet.id}
+                              className="cursor-pointer"
+                              onClick={() => navigate(`/sheets/${sheet.id}`)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center">
+                                  <File className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  {sheet.name}
+                                  {sheet.starred && <Star className="ml-2 h-4 w-4 text-yellow-400" />}
+                                </div>
+                              </TableCell>
+                              <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
+                              <TableCell className="text-right">
+                                <SheetItemActions sheet={sheet} />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        {filteredSheets.filter(sheet => sheet.shared).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                              No shared sheets. Share a sheet with others to see it here.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                </>
+              ) : (
+                // Grid view
+                <>
+                  <TabsContent value="recent" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredSheets.map((sheet) => (
+                        <Card 
+                          key={sheet.id} 
+                          className="cursor-pointer hover:shadow-md transition-shadow"
                           onClick={() => navigate(`/sheets/${sheet.id}`)}
                         >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <File className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {sheet.name}
-                              <Star className="ml-2 h-4 w-4 text-yellow-400" />
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-                              <MoreHorizontal className="h-4 w-4" />
+                          <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center justify-between">
+                              <div className="flex items-center truncate">
+                                <File className="h-4 w-4 mr-2 flex-shrink-0" />
+                                <span className="truncate">{sheet.name}</span>
+                              </div>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => toggleStarred(sheet.id)}
+                                >
+                                  <Star className={`h-4 w-4 ${sheet.starred ? "fill-yellow-400 text-yellow-400" : ""}`} />
+                                </Button>
+                              </div>
+                            </CardTitle>
+                            <CardDescription>
+                              Last modified: {formatDate(sheet.updatedAt)}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardFooter className="pt-2 flex justify-between">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSheetToRename({ id: sheet.id, name: sheet.name });
+                                setNewSheetName(sheet.name);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5 mr-1" />
+                              Rename
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-              
-              <TabsContent value="shared" className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[400px]">Name</TableHead>
-                      <TableHead>Last Modified</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSheets
-                      .filter(sheet => sheet.shared)
-                      .map((sheet) => (
-                        <TableRow 
-                          key={sheet.id}
-                          className="cursor-pointer"
-                          onClick={() => navigate(`/sheets/${sheet.id}`)}
-                        >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <File className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {sheet.name}
-                              {sheet.starred && <Star className="ml-2 h-4 w-4 text-yellow-400" />}
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatDate(sheet.updatedAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
-                              <MoreHorizontal className="h-4 w-4" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive border-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSheetToDelete(sheet.id);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Delete
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                          </CardFooter>
+                        </Card>
                       ))}
-                  </TableBody>
-                </Table>
-              </TabsContent>
+                      {filteredSheets.length === 0 && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                          No sheets found. Create a new sheet to get started.
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="starred" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredSheets
+                        .filter(sheet => sheet.starred)
+                        .map((sheet) => (
+                          <Card 
+                            key={sheet.id} 
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() => navigate(`/sheets/${sheet.id}`)}
+                          >
+                            <CardHeader className="pb-2">
+                              <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center truncate">
+                                  <File className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">{sheet.name}</span>
+                                </div>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => toggleStarred(sheet.id)}
+                                  >
+                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  </Button>
+                                </div>
+                              </CardTitle>
+                              <CardDescription>
+                                Last modified: {formatDate(sheet.updatedAt)}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardFooter className="pt-2 flex justify-between">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSheetToRename({ id: sheet.id, name: sheet.name });
+                                  setNewSheetName(sheet.name);
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5 mr-1" />
+                                Rename
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSheetToDelete(sheet.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                Delete
+                              </Button>
+                            </CardFooter>
+                          </Card>
+                        ))}
+                      {filteredSheets.filter(sheet => sheet.starred).length === 0 && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                          No starred sheets. Star a sheet to add it to this list.
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="shared" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredSheets
+                        .filter(sheet => sheet.shared)
+                        .map((sheet) => (
+                          <Card 
+                            key={sheet.id} 
+                            className="cursor-pointer hover:shadow-md transition-shadow"
+                            onClick={() => navigate(`/sheets/${sheet.id}`)}
+                          >
+                            <CardHeader className="pb-2">
+                              <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center truncate">
+                                  <File className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">{sheet.name}</span>
+                                </div>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => toggleStarred(sheet.id)}
+                                  >
+                                    <Star className={`h-4 w-4 ${sheet.starred ? "fill-yellow-400 text-yellow-400" : ""}`} />
+                                  </Button>
+                                </div>
+                              </CardTitle>
+                              <CardDescription>
+                                Last modified: {formatDate(sheet.updatedAt)}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardFooter className="pt-2 flex justify-between">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSheetToRename({ id: sheet.id, name: sheet.name });
+                                  setNewSheetName(sheet.name);
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5 mr-1" />
+                                Rename
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSheetToDelete(sheet.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                Delete
+                              </Button>
+                            </CardFooter>
+                          </Card>
+                        ))}
+                      {filteredSheets.filter(sheet => sheet.shared).length === 0 && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                          No shared sheets. Share a sheet with others to see it here.
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </>
+              )}
             </Tabs>
           </div>
         )}
@@ -255,6 +680,50 @@ const Dashboard = () => {
           </p>
         </div>
       </footer>
+      
+      {/* Rename sheet dialog */}
+      <AlertDialog open={!!sheetToRename} onOpenChange={(open) => !open && setSheetToRename(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rename Sheet</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter a new name for your sheet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input 
+            value={newSheetName} 
+            onChange={(e) => setNewSheetName(e.target.value)}
+            className="mt-2"
+            placeholder="Sheet name"
+            autoFocus
+          />
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel onClick={() => setSheetToRename(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRenameSheet}>Rename</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!sheetToDelete} onOpenChange={(open) => !open && setSheetToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Sheet</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the sheet and all its data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSheetToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => sheetToDelete && handleDeleteSheet(sheetToDelete)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

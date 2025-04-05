@@ -8,7 +8,8 @@ import {
   SignedIn, 
   SignedOut, 
   RedirectToSignIn, 
-  useAuth
+  useAuth,
+  UserProfile
 } from "@clerk/clerk-react";
 import { LiveblocksProvider } from "./providers/LiveblocksProvider";
 import Index from "./pages/Index";
@@ -62,6 +63,43 @@ const App = () => (
                   <Dashboard />
                 </ProtectedRoute>
               } 
+            />
+            
+            {/* Account Settings */}
+            <Route 
+              path="/account/*" 
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+                      <div className="container flex h-16 items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-primary p-1.5 rounded">
+                            <div className="h-5 w-5 rounded-sm bg-white"></div>
+                          </div>
+                          <span className="text-xl font-bold">SheetSync</span>
+                        </div>
+                      </div>
+                    </header>
+                    
+                    <main className="flex-1 container py-6">
+                      <UserProfile 
+                        appearance={{
+                          elements: {
+                            rootBox: "w-full mx-auto max-w-3xl",
+                            card: "rounded-lg shadow-sm border",
+                            navbar: "hidden",
+                            navbarMobileMenuButton: "hidden",
+                            pageScrollBox: "p-0 pb-4"
+                          }
+                        }}
+                        routing="path"
+                        path="/account"
+                      />
+                    </main>
+                  </div>
+                </ProtectedRoute>
+              }
             />
             
             {/* Fallback route */}

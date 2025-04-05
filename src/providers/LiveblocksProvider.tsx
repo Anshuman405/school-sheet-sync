@@ -48,8 +48,41 @@ export const {
 
 interface LiveblocksProviderProps {
   children: ReactNode;
+  roomId?: string;
+  initialPresence?: Presence;
+  initialStorage?: Storage;
 }
 
-export const LiveblocksProvider = ({ children }: LiveblocksProviderProps) => {
-  return children;
+export const LiveblocksProvider = ({ 
+  children, 
+  roomId = "default-room",
+  initialPresence = {
+    firstName: "",
+    lastName: "",
+    cursor: null
+  },
+  initialStorage
+}: LiveblocksProviderProps) => {
+  // Create a properly typed LiveMap instance for the sheets
+  const defaultInitialStorage: Storage = {
+    sheets: new LiveMap<
+      string, 
+      LiveObject<{
+        name: string;
+        data: LiveList<LiveList<string>>;
+        columns: number;
+        rows: number;
+      }>
+    >()
+  };
+
+  return (
+    <LiveblocksRoomProvider
+      id={roomId}
+      initialPresence={initialPresence}
+      initialStorage={initialStorage || defaultInitialStorage}
+    >
+      {children}
+    </LiveblocksRoomProvider>
+  );
 };
