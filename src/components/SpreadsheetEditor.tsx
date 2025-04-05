@@ -877,3 +877,58 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       <div className="rounded-b-lg border overflow-auto h-[calc(100vh-220px)]">
         <div className="min-w-max">
+          <table ref={spreadsheetTableRef} className="min-w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="w-16 bg-muted text-muted-foreground">#</th>
+                {Array.from({ length: columns }, (_, i) => (
+                  <th key={i} className="w-16 bg-muted text-muted-foreground">
+                    {getColumnLabel(i)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  <td className="w-16 bg-muted text-muted-foreground">{rowIndex + 1}</td>
+                  {row.map((cellValue, colIndex) => (
+                    <td 
+                      key={colIndex} 
+                      data-row={rowIndex} 
+                      data-col={colIndex}
+                      className={`border p-2 ${isCellSelected(rowIndex, colIndex) ? 'bg-accent' : ''}`}
+                      style={getCellStyle(rowIndex, colIndex)}
+                      onMouseDown={() => handleCellMouseDown(rowIndex, colIndex)}
+                      onMouseOver={() => handleCellMouseOver(rowIndex, colIndex)}
+                      onMouseUp={handleCellMouseUp}
+                    >
+                      <input 
+                        type="text" 
+                        value={cellValue} 
+                        onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)} 
+                        className="w-full h-full bg-transparent border-none outline-none"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+export default function SpreadsheetEditor({ sheetId, initialSheetName }: SpreadsheetEditorProps) {
+  const { user } = useUser();
+  const room = useRoom();
+  const myPresence = useMyPresence();
+  const self = useSelf();
+  
+  return (
+    <LiveblocksRoomProvider id={sheetId} userId={user?.id || ""} userInfo={{ firstName: user?.firstName || "", lastName: user?.lastName || "" }}>
+      <SpreadsheetEditorContent sheetId={sheetId} initialSheetName={initialSheetName} />
+    </LiveblocksRoomProvider>
+  );
+}
