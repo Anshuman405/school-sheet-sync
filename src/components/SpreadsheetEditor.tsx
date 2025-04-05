@@ -7,9 +7,11 @@ import {
   useMyPresence, 
   useOthers, 
   useSelf,
-  RoomProvider 
-} from "@liveblocks/react";
-import { LiveObject, LiveMap } from "@liveblocks/client";
+  useStorage,
+  useMutation,
+  LiveblocksRoomProvider
+} from "@/providers/LiveblocksProvider";
+import { LiveList, LiveObject } from "@liveblocks/client";
 import { 
   ArrowLeft, 
   Save, 
@@ -342,16 +344,19 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
 // Wrap the component with RoomProvider
 const SpreadsheetEditor = ({ sheetId }: SpreadsheetEditorProps) => {
   return (
-    <RoomProvider
+    <LiveblocksRoomProvider
       id={`sheet-${sheetId}`}
       initialPresence={{
         firstName: "",
         lastName: "",
         cursor: null,
       }}
+      initialStorage={{
+        sheets: new LiveMap()
+      }}
     >
       <SpreadsheetEditorContent sheetId={sheetId} />
-    </RoomProvider>
+    </LiveblocksRoomProvider>
   );
 };
 
