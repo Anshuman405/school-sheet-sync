@@ -1,8 +1,11 @@
 
 import { ReactNode } from 'react';
 import { 
-  createClient, 
-  LiveblocksProvider as LiveblocksProviderComponent 
+  createClient
+} from '@liveblocks/client';
+import { 
+  LiveblocksProvider as LiveblocksProviderComponent,
+  RoomProvider
 } from '@liveblocks/react';
 
 const client = createClient({
