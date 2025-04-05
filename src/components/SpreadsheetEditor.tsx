@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -11,7 +10,7 @@ import {
   useMutation,
   LiveblocksRoomProvider
 } from "@/providers/LiveblocksProvider";
-import { LiveList, LiveObject } from "@liveblocks/client";
+import { LiveList, LiveObject, LiveMap } from "@liveblocks/client";
 import { 
   ArrowLeft, 
   Save, 
