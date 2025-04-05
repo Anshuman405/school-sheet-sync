@@ -1,21 +1,63 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSignIn } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { isLoaded, signIn, setActive } = useSignIn();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real implementation, this would handle the authentication
-    console.log("Login attempt with:", email, password);
+    
+    if (!isLoaded) {
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
+      
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        toast({
+          title: "Success!",
+          description: "You have successfully logged in.",
+        });
+        navigate("/dashboard");
+      } else {
+        toast({
+          title: "Error",
+          description: "Login failed. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Error",
+        description: "Login failed. Please check your credentials and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -38,6 +80,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -55,6 +98,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -63,7 +107,9 @@ const Login = () => {
               <Label htmlFor="remember" className="text-sm font-normal">Remember me for 30 days</Label>
             </div>
             
-            <Button type="submit" className="w-full">Sign in</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Signing in..." : "Sign in"}
+            </Button>
           </form>
           
           <div className="mt-6 text-center text-sm">

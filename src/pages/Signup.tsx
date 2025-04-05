@@ -1,22 +1,66 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSignUp } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const Signup = () => {
-  const [name, setName] = useState("");
+  const navigate = useNavigate();
+  const { isLoaded, signUp, setActive } = useSignUp();
+  
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real implementation, this would handle the registration
-    console.log("Signup with:", name, email, password);
+    
+    if (!isLoaded) {
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      const result = await signUp.create({
+        firstName,
+        lastName,
+        emailAddress: email,
+        password,
+      });
+      
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        toast({
+          title: "Account created!",
+          description: "You have successfully signed up.",
+        });
+        navigate("/dashboard");
+      } else {
+        toast({
+          title: "Verification needed",
+          description: "Please check your email to verify your account.",
+        });
+      }
+    } catch (error) {
+      console.error("Signup error:", error);
+      toast({
+        title: "Error",
+        description: "Sign up failed. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,16 +74,32 @@ const Signup = () => {
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input 
-                id="name" 
-                type="text" 
-                placeholder="Your full name" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input 
+                  id="firstName" 
+                  type="text" 
+                  placeholder="First name" 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input 
+                  id="lastName" 
+                  type="text" 
+                  placeholder="Last name" 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
             </div>
             
             <div className="space-y-2">
@@ -51,6 +111,7 @@ const Signup = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -63,6 +124,7 @@ const Signup = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
                 Must be at least 8 characters and include a number and symbol
@@ -83,7 +145,9 @@ const Signup = () => {
               </Label>
             </div>
             
-            <Button type="submit" className="w-full">Create account</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Creating account..." : "Create account"}
+            </Button>
           </form>
           
           <div className="mt-6 text-center text-sm">
