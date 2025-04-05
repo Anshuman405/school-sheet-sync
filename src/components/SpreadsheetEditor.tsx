@@ -342,6 +342,9 @@ const SpreadsheetEditorContent = ({ sheetId }: SpreadsheetEditorProps) => {
 
 // Wrap the component with RoomProvider
 const SpreadsheetEditor = ({ sheetId }: SpreadsheetEditorProps) => {
+  // Create an instance of LiveMap to use in initialStorage
+  const initialSheetsMap = new LiveMap();
+  
   return (
     <LiveblocksRoomProvider
       id={`sheet-${sheetId}`}
@@ -351,7 +354,7 @@ const SpreadsheetEditor = ({ sheetId }: SpreadsheetEditorProps) => {
         cursor: null,
       }}
       initialStorage={{
-        sheets: new LiveMap()
+        sheets: initialSheetsMap
       }}
     >
       <SpreadsheetEditorContent sheetId={sheetId} />
