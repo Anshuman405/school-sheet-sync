@@ -82,15 +82,11 @@ const App = () => (
                       </div>
                     </header>
                     
-                    <main className="flex-1 container py-6">
+                    <main className="flex-1 container py-6 justify-center">
                       <UserProfile 
                         appearance={{
                           elements: {
-                            rootBox: "w-full mx-auto max-w-3xl",
-                            card: "rounded-lg shadow-sm border",
-                            navbar: "hidden",
                             navbarMobileMenuButton: "hidden",
-                            pageScrollBox: "p-0 pb-4"
                           }
                         }}
                         routing="path"
