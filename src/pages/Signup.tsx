@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignUp } from "@clerk/clerk-react";
@@ -14,30 +13,30 @@ import Footer from "@/components/Footer";
 const Signup = () => {
   const navigate = useNavigate();
   const { isLoaded, signUp, setActive } = useSignUp();
-  
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isLoaded) {
       return;
     }
-    
+
     try {
       setIsLoading(true);
-      
+
       const result = await signUp.create({
         firstName,
         lastName,
         emailAddress: email,
         password,
       });
-      
+
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         toast({
@@ -72,28 +71,28 @@ const Signup = () => {
             <h1 className="text-2xl font-bold">Create an account</h1>
             <p className="text-muted-foreground mt-2">Start your free trial with SheetSync</p>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input 
-                  id="firstName" 
-                  type="text" 
-                  placeholder="First name" 
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="First name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
                   disabled={isLoading}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input 
-                  id="lastName" 
-                  type="text" 
-                  placeholder="Last name" 
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Last name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
@@ -101,26 +100,26 @@ const Signup = () => {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="name@school.edu" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@school.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="Create a strong password" 
+              <Input
+                id="password"
+                type="password"
+                placeholder="Create a strong password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -130,7 +129,7 @@ const Signup = () => {
                 Must be at least 8 characters and include a number and symbol
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox id="terms" required />
               <Label htmlFor="terms" className="text-sm font-normal">
@@ -144,12 +143,12 @@ const Signup = () => {
                 </Link>
               </Label>
             </div>
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          
+
           <div className="mt-6 text-center text-sm">
             <p className="text-muted-foreground">
               Already have an account?{" "}
