@@ -35,7 +35,8 @@ import {
   Scissors,
   Copy,
   Clipboard,
-  MinusSquare
+  MinusSquare,
+  Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { isFormula, evaluateFormula } from "@/utils/formulaUtils";
 
 interface SpreadsheetEditorProps {
   sheetId: string;
@@ -95,12 +97,16 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   const [isCopying, setIsCopying] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
+  const [displayedCellValues, setDisplayedCellValues] = useState<Record<string, string>>({});
   
   const titleInputRef = useRef<HTMLInputElement>(null);
   const spreadsheetTableRef = useRef<HTMLTableElement>(null);
   
   // Get sheet data from Liveblocks storage
-  const sheet = useStorage(root => root?.sheets?.get(sheetId));
+  const sheet = useStorage(root => {
+    if (!root) return undefined;
+    return root.sheets?.get(sheetId);
+  });
   
   // Default values for new sheets
   const DEFAULT_COLUMNS = 50;
@@ -108,7 +114,10 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Initialize a new sheet or load existing one from Liveblocks
   const initializeSheet = useMutation(({ storage, setMyPresence }) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
     
     if (!sheets.has(sheetId)) {
       // Create a new sheet if it doesn't exist
@@ -157,7 +166,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Handle cell changes
   const updateCell = useMutation(({ storage }, rowIndex: number, colIndex: number, value: string) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -171,6 +184,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           sheet.update({
             updatedAt: new Date().toISOString()
           });
+          
+          // We need to recalculate any formulas that might depend on this cell
+          recalculateAllFormulas();
         }
       }
     }
@@ -178,7 +194,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Update sheet name
   const updateSheetName = useMutation(({ storage }, newName: string) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -191,7 +211,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Add a new row
   const addRow = useMutation(({ storage }, rowIndex: number) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -218,13 +242,20 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           rows: rows + 1,
           updatedAt: new Date().toISOString()
         });
+        
+        // Recalculate formulas after adding a row
+        recalculateAllFormulas();
       }
     }
   }, [sheetId]);
   
   // Remove a row
   const removeRow = useMutation(({ storage }, rowIndex: number) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -239,13 +270,20 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           rows: rows - 1,
           updatedAt: new Date().toISOString()
         });
+        
+        // Recalculate formulas after removing a row
+        recalculateAllFormulas();
       }
     }
   }, [sheetId]);
   
   // Add a new column
   const addColumn = useMutation(({ storage }, colIndex: number) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -270,13 +308,20 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           columns: columns + 1,
           updatedAt: new Date().toISOString()
         });
+        
+        // Recalculate formulas after adding a column
+        recalculateAllFormulas();
       }
     }
   }, [sheetId]);
   
   // Remove a column
   const removeColumn = useMutation(({ storage }, colIndex: number) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -297,9 +342,62 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           columns: columns - 1,
           updatedAt: new Date().toISOString()
         });
+        
+        // Recalculate formulas after removing a column
+        recalculateAllFormulas();
       }
     }
   }, [sheetId]);
+  
+  // Get cell value (safely)
+  const getCellValue = (rowIndex: number, colIndex: number): string => {
+    if (!sheet) return "";
+    
+    try {
+      const data = sheet.toObject().data;
+      if (!data || rowIndex >= data.length) return "";
+      
+      const row = data[rowIndex];
+      if (!row || colIndex >= row.length) return "";
+      
+      return row[colIndex] || "";
+    } catch (error) {
+      console.error("Error getting cell value:", error);
+      return "";
+    }
+  };
+  
+  // Recalculate all formulas in the sheet
+  const recalculateAllFormulas = () => {
+    if (!sheet) return;
+    
+    try {
+      const sheetObj = sheet.toObject();
+      const data = sheetObj.data;
+      const newDisplayedValues: Record<string, string> = {};
+      
+      if (!data) return;
+      
+      for (let r = 0; r < data.length; r++) {
+        const row = data[r];
+        if (!row) continue;
+        
+        for (let c = 0; c < row.length; c++) {
+          const cellValue = row[c] || "";
+          
+          if (isFormula(cellValue)) {
+            const result = evaluateFormula(cellValue, getCellValue);
+            const cellKey = `${r}-${c}`;
+            newDisplayedValues[cellKey] = result;
+          }
+        }
+      }
+      
+      setDisplayedCellValues(newDisplayedValues);
+    } catch (error) {
+      console.error("Error recalculating formulas:", error);
+    }
+  };
   
   // Initialize sheet on first render
   useEffect(() => {
@@ -311,8 +409,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     if (sheet) {
       try {
-        const name = sheet.get("name");
-        setTempSheetName(name);
+        const sheetObj = sheet.toObject();
+        setTempSheetName(sheetObj.name);
+        recalculateAllFormulas();
         setIsLoading(false);
       } catch (error) {
         console.error("Error accessing sheet data:", error);
@@ -321,6 +420,13 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       }
     }
   }, [sheet, initializeSheet, initialSheetName]);
+  
+  // Recalculate formulas whenever sheet data changes
+  useEffect(() => {
+    if (sheet) {
+      recalculateAllFormulas();
+    }
+  }, [sheet]);
   
   // Generate column labels (A, B, C, etc.)
   const getColumnLabel = (index: number) => {
@@ -371,7 +477,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     if (!sheet) return;
     
     try {
-      const data = sheet.get("data");
+      const sheetObj = sheet.toObject();
+      const data = sheetObj.data;
       const csvRows: string[] = [];
       
       if (!data) {
@@ -380,13 +487,17 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       // Convert data to CSV format
       for (let i = 0; i < data.length; i++) {
-        const row = data.get(i);
+        const row = data[i];
         if (row) {
           const csvRow: string[] = [];
           for (let j = 0; j < row.length; j++) {
-            const cell = row.get(j) || "";
+            const cellValue = row[j] || "";
+            // Use displayed value for formulas
+            const displayValue = isFormula(cellValue) 
+              ? displayedCellValues[`${i}-${j}`] || cellValue 
+              : cellValue;
             // Escape quotes and handle commas
-            csvRow.push(`"${cell.replace(/"/g, '""')}"`);
+            csvRow.push(`"${displayValue.replace(/"/g, '""')}"`);
           }
           csvRows.push(csvRow.join(","));
         }
@@ -397,7 +508,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `${sheet.get("name") || "sheet"}.csv`);
+      link.setAttribute("download", `${sheetObj.name || "sheet"}.csv`);
       link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
@@ -428,7 +539,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
         addRow(rowIndex);
       } else {
         // Just add at the end
-        const data = sheet.get("data");
+        const sheetObj = sheet.toObject();
+        const data = sheetObj.data;
         if (data) {
           addRow(data.length - 1);
         } else {
@@ -482,7 +594,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
         addColumn(colIndex);
       } else {
         // Just add at the end
-        const columns = sheet.get("columns");
+        const sheetObj = sheet.toObject();
+        const columns = sheetObj.columns;
         if (columns !== undefined) {
           addColumn(columns - 1);
         } else {
@@ -531,7 +644,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     setIsEditingTitle(true);
     try {
-      setTempSheetName(sheet.get("name") || "Untitled Sheet");
+      const sheetObj = sheet.toObject();
+      setTempSheetName(sheetObj.name || "Untitled Sheet");
     } catch (error) {
       console.error("Error accessing sheet name:", error);
       setTempSheetName("Untitled Sheet");
@@ -560,7 +674,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       // Don't allow empty sheet names
       if (sheet) {
         try {
-          setTempSheetName(sheet.get("name") || "Untitled Sheet");
+          const sheetObj = sheet.toObject();
+          setTempSheetName(sheetObj.name || "Untitled Sheet");
         } catch (error) {
           console.error("Error accessing sheet name:", error);
           setTempSheetName("Untitled Sheet");
@@ -663,7 +778,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     return {
       fontWeight: format.bold ? 'bold' : 'normal',
-      textAlign: format.align as TextAlign
+      textAlign: format.align
     };
   };
   
@@ -678,7 +793,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     let copyText = '';
     try {
-      const data = sheet.get("data");
+      const sheetObj = sheet.toObject();
+      const data = sheetObj.data;
       
       if (!data) {
         throw new Error("Sheet data is undefined");
@@ -686,11 +802,17 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       for (let r = minRow; r <= maxRow; r++) {
         const rowData = [];
-        const row = data.get(r);
+        const row = data[r];
         
         if (row) {
           for (let c = minCol; c <= maxCol; c++) {
-            rowData.push(row.get(c) || '');
+            const cellValue = row[c] || '';
+            // If it's a formula, copy the displayed value
+            if (isFormula(cellValue)) {
+              rowData.push(displayedCellValues[`${r}-${c}`] || cellValue);
+            } else {
+              rowData.push(cellValue);
+            }
           }
           copyText += rowData.join('\t') + '\n';
         }
@@ -732,11 +854,6 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       const targetRow = selectedCells.startRow;
       const targetCol = selectedCells.startCol;
-      const data = sheet.get("data");
-      
-      if (!data) {
-        throw new Error("Sheet data is undefined");
-      }
       
       pasteRows.forEach((rowText, rowOffset) => {
         const rowCells = rowText.split('\t');
@@ -744,12 +861,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           const pasteRowIdx = targetRow + rowOffset;
           const pasteColIdx = targetCol + colOffset;
           
-          if (pasteRowIdx < data.length) {
-            const row = data.get(pasteRowIdx);
-            if (row && pasteColIdx < row.length) {
-              updateCell(pasteRowIdx, pasteColIdx, cellValue);
-            }
-          }
+          updateCell(pasteRowIdx, pasteColIdx, cellValue);
         });
       });
       
@@ -785,36 +897,16 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
         const minCol = Math.min(selectedCells.startCol, selectedCells.endCol);
         const maxCol = Math.max(selectedCells.startCol, selectedCells.endCol);
         
-        try {
-          const data = sheet.get("data");
-          
-          if (!data) {
-            throw new Error("Sheet data is undefined");
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            updateCell(r, c, '');
           }
-          
-          for (let r = minRow; r <= maxRow; r++) {
-            const row = data.get(r);
-            if (row) {
-              for (let c = minCol; c <= maxCol; c++) {
-                if (c < row.length) {
-                  updateCell(r, c, '');
-                }
-              }
-            }
-          }
-          
-          toast({
-            title: "Cells cleared",
-            description: "Selected cells have been cleared.",
-          });
-        } catch (error) {
-          console.error("Error clearing cells:", error);
-          toast({
-            title: "Error",
-            description: "Failed to clear cells.",
-            variant: "destructive",
-          });
         }
+        
+        toast({
+          title: "Cells cleared",
+          description: "Selected cells have been cleared.",
+        });
       }
     }
   };
@@ -859,41 +951,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   }
   
   // Safely get sheet properties with fallbacks
-  const sheetName = (() => {
-    try {
-      return sheet.get("name") || "Untitled Sheet";
-    } catch (error) {
-      console.error("Error accessing sheet name:", error);
-      return "Untitled Sheet";
-    }
-  })();
-  
-  const sheetColumns = (() => {
-    try {
-      return sheet.get("columns") || DEFAULT_COLUMNS;
-    } catch (error) {
-      console.error("Error accessing sheet columns:", error);
-      return DEFAULT_COLUMNS;
-    }
-  })();
-  
-  const sheetRows = (() => {
-    try {
-      return sheet.get("rows") || DEFAULT_ROWS;
-    } catch (error) {
-      console.error("Error accessing sheet rows:", error);
-      return DEFAULT_ROWS;
-    }
-  })();
-  
-  const sheetData = (() => {
-    try {
-      return sheet.get("data");
-    } catch (error) {
-      console.error("Error accessing sheet data:", error);
-      return null;
-    }
-  })();
+  const sheetObj = sheet.toObject();
+  const sheetName = sheetObj.name || "Untitled Sheet";
+  const sheetColumns = sheetObj.columns || DEFAULT_COLUMNS;
+  const sheetRows = sheetObj.rows || DEFAULT_ROWS;
+  const sheetData = sheetObj.data || [];
   
   return (
     <div className="space-y-4" tabIndex={-1} onKeyDown={handleKeyDown}>
@@ -1032,6 +1094,13 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
         
         <Separator orientation="vertical" className="h-8" />
         
+        <div className="flex items-center">
+          <Calculator size={16} className="mr-1 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Formulas: Start with = (e.g., =A1+B2)</span>
+        </div>
+        
+        <Separator orientation="vertical" className="h-8" />
+        
         {selectedCells && (
           <>
             <Button size="sm" variant="outline" className="h-8" onClick={handleCopy}>
@@ -1114,14 +1183,17 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
               </tr>
             </thead>
             <tbody>
-              {sheetData && Array.from({ length: sheetRows }, (_, rowIndex) => {
-                const row = sheetData.get(rowIndex);
+              {Array.from({ length: sheetRows }, (_, rowIndex) => {
+                const row = sheetData[rowIndex] || [];
                 
                 return (
                   <tr key={rowIndex}>
                     <td className="w-16 bg-muted text-muted-foreground">{rowIndex + 1}</td>
                     {Array.from({ length: sheetColumns }, (_, colIndex) => {
-                      const cellValue = row ? (row.get(colIndex) || "") : "";
+                      const cellValue = row[colIndex] || "";
+                      const displayValue = isFormula(cellValue)
+                        ? displayedCellValues[`${rowIndex}-${colIndex}`] || ""
+                        : cellValue;
                       
                       return (
                         <td 
@@ -1139,7 +1211,13 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
                             value={cellValue} 
                             onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)} 
                             className="w-full h-full bg-transparent border-none outline-none"
+                            placeholder={isFormula(cellValue) ? displayValue : ""}
                           />
+                          {isFormula(cellValue) && (
+                            <div className="absolute bg-background shadow-md rounded p-1 text-xs -mt-6 ml-1">
+                              {displayValue}
+                            </div>
+                          )}
                         </td>
                       );
                     })}

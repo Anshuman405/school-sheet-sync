@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -83,11 +82,18 @@ const DashboardContent = () => {
   const [sheetToDelete, setSheetToDelete] = useState<string | null>(null);
   
   // Get sheets from Liveblocks storage
-  const sheets = useStorage(root => root?.sheets);
+  const sheets = useStorage(root => {
+    if (!root) return undefined;
+    return root.sheets;
+  });
   
   // Create a new sheet
   const createNewSheet = useMutation(({ storage }) => {
+    if (!storage) return null;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return null;
+    
     const newId = `sheet-${Date.now()}`;
     
     // Create initial rows
@@ -120,7 +126,11 @@ const DashboardContent = () => {
   
   // Rename a sheet
   const renameSheet = useMutation(({ storage }, sheetId: string, newName: string) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -133,13 +143,21 @@ const DashboardContent = () => {
   
   // Delete a sheet
   const deleteSheet = useMutation(({ storage }, sheetId: string) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     sheets.delete(sheetId);
   }, []);
   
   // Toggle starred status
   const toggleStarred = useMutation(({ storage }, sheetId: string) => {
+    if (!storage) return;
+    
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+    
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
@@ -154,13 +172,27 @@ const DashboardContent = () => {
   // Filter sheets based on search query and convert to array for rendering
   const filteredSheets: Sheet[] = sheets ? 
     Array.from(sheets.entries())
-      .map(([id, sheet]) => ({
-        id,
-        name: sheet.get("name"),
-        updatedAt: sheet.get("updatedAt"),
-        starred: sheet.get("starred") || false,
-        shared: sheet.get("shared") || false
-      }))
+      .map(([id, sheetObj]) => {
+        try {
+          const sheet = sheetObj.toObject();
+          return {
+            id,
+            name: sheet.name,
+            updatedAt: sheet.updatedAt,
+            starred: sheet.starred || false,
+            shared: sheet.shared || false
+          };
+        } catch (error) {
+          console.error(`Error processing sheet ${id}:`, error);
+          return {
+            id,
+            name: "Error Loading Sheet",
+            updatedAt: new Date().toISOString(),
+            starred: false,
+            shared: false
+          };
+        }
+      })
       .filter(sheet => sheet.name.toLowerCase().includes(searchQuery.toLowerCase()))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     : [];
@@ -184,13 +216,26 @@ const DashboardContent = () => {
   };
   
   const handleCreateNewSheet = () => {
-    const newId = createNewSheet();
-    navigate(`/sheets/${newId}`);
-    
-    toast({
-      title: "New sheet created",
-      description: "Your new spreadsheet is ready to edit.",
-    });
+    try {
+      const newId = createNewSheet();
+      if (newId) {
+        navigate(`/sheets/${newId}`);
+        
+        toast({
+          title: "New sheet created",
+          description: "Your new spreadsheet is ready to edit.",
+        });
+      } else {
+        throw new Error("Failed to create new sheet");
+      }
+    } catch (error) {
+      console.error("Error creating sheet:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create a new sheet. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   const handleDeleteSheet = (id: string) => {
@@ -276,11 +321,15 @@ const DashboardContent = () => {
   useEffect(() => {
     return () => {
       if (sheetId && sheets && sheets.has(sheetId)) {
-        const sheet = sheets.get(sheetId);
-        if (sheet) {
-          sheet.update({
-            updatedAt: new Date().toISOString()
-          });
+        try {
+          const sheet = sheets.get(sheetId);
+          if (sheet) {
+            sheet.update({
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error("Error updating sheet timestamp:", error);
         }
       }
     };
@@ -362,7 +411,6 @@ const DashboardContent = () => {
             initialSheetName={filteredSheets.find(s => s.id === sheetId)?.name}
           />
         ) : (
-          // Show dashboard with sheets list
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold tracking-tight">Your Sheets</h1>
