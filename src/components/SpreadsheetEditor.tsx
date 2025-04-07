@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { 
@@ -9,9 +9,13 @@ import {
   useSelf,
   useStorage,
   useMutation,
-  LiveblocksRoomProvider
+  LiveblocksRoomProvider,
+  Presence,
+  Storage,
+  SheetData,
+  defaultInitialStorage
 } from "@/providers/LiveblocksProvider";
-import { LiveList, LiveObject, LiveMap } from "@liveblocks/client";
+import { LiveList, LiveObject } from "@liveblocks/client";
 import { 
   ArrowLeft, 
   Save, 
@@ -67,6 +71,11 @@ interface SpreadsheetEditorProps {
   initialSheetName?: string;
 }
 
+type CellFormat = {
+  bold: boolean;
+  align: 'left' | 'center' | 'right';
+};
+
 const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEditorProps) => {
   const navigate = useNavigate();
   const { user } = useUser();
@@ -76,14 +85,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   const [tempSheetName, setTempSheetName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCells, setSelectedCells] = useState<{startRow: number, startCol: number, endRow: number, endCol: number} | null>(null);
-  const [activeCellFormat, setActiveCellFormat] = useState<{
-    bold: boolean;
-    align: 'left' | 'center' | 'right';
-  }>({
+  const [activeCellFormat, setActiveCellFormat] = useState<CellFormat>({
     bold: false,
     align: 'left'
   });
-  const [cellFormats, setCellFormats] = useState<Record<string, { bold: boolean; align: string }>>({});
+  const [cellFormats, setCellFormats] = useState<Record<string, CellFormat>>({});
   const [isCopying, setIsCopying] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
@@ -92,8 +98,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   const spreadsheetTableRef = useRef<HTMLTableElement>(null);
   
   // Get sheet data from Liveblocks storage
-  const storage = useStorage();
-  const sheet = useStorage(root => root.sheets.get(sheetId));
+  const sheet = useStorage(root => root?.sheets?.get(sheetId));
   
   // Default values for new sheets
   const DEFAULT_COLUMNS = 50;
@@ -105,11 +110,11 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     if (!sheets.has(sheetId)) {
       // Create a new sheet if it doesn't exist
-      const initialData = new LiveList();
+      const initialData = new LiveList<LiveList<string>>();
       
       // Create initial rows
       for (let i = 0; i < DEFAULT_ROWS; i++) {
-        const row = new LiveList();
+        const row = new LiveList<string>();
         // Fill row with empty cells
         for (let j = 0; j < DEFAULT_COLUMNS; j++) {
           row.push("");
@@ -118,12 +123,14 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       }
       
       // Create the sheet object with name, data, columns and rows
-      const sheetObj = new LiveObject({
+      const sheetObj = new LiveObject<SheetData>({
         name: initialSheetName || "Untitled Sheet",
         data: initialData,
         columns: DEFAULT_COLUMNS,
         rows: DEFAULT_ROWS,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        starred: false,
+        shared: false
       });
       
       // Add the new sheet to the sheets map
@@ -191,7 +198,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       const rows = sheet.get("rows");
       
       // Create a new empty row
-      const newRow = new LiveList();
+      const newRow = new LiveList<string>();
       for (let i = 0; i < columns; i++) {
         newRow.push("");
       }
@@ -292,7 +299,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   useEffect(() => {
     setIsLoading(true);
     
-    if (storage && !sheet) {
+    if (!sheet) {
       initializeSheet();
     }
     
@@ -300,7 +307,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       setTempSheetName(sheet.get("name"));
       setIsLoading(false);
     }
-  }, [storage, sheet, initializeSheet]);
+  }, [sheet, initializeSheet]);
   
   // Generate column labels (A, B, C, etc.)
   const getColumnLabel = (index: number) => {
@@ -594,13 +601,13 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   };
   
   // Get cell style based on its format
-  const getCellStyle = (rowIndex: number, colIndex: number) => {
+  const getCellStyle = (rowIndex: number, colIndex: number): CSSProperties => {
     const cellKey = `${rowIndex}-${colIndex}`;
     const format = cellFormats[cellKey] || { bold: false, align: 'left' };
     
     return {
       fontWeight: format.bold ? 'bold' : 'normal',
-      textAlign: format.align
+      textAlign: format.align as 'left' | 'center' | 'right'
     };
   };
   
@@ -804,7 +811,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           </h1>
         )}
         
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-4">
           <div className="flex -space-x-2">
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm border-2 border-background">
               {user?.firstName ? user.firstName.charAt(0) : user?.username ? user.username.charAt(0) : "U"}
@@ -1037,6 +1044,7 @@ export default function SpreadsheetEditor({ sheetId, initialSheetName }: Spreads
         lastName: user?.lastName || "",
         cursor: null
       }}
+      initialStorage={defaultInitialStorage}
     >
       <SpreadsheetEditorContent sheetId={sheetId} initialSheetName={initialSheetName} />
     </LiveblocksRoomProvider>

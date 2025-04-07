@@ -51,7 +51,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import SpreadsheetEditor from "@/components/SpreadsheetEditor";
@@ -59,9 +58,19 @@ import {
   useRoom, 
   useStorage, 
   useMutation, 
-  LiveblocksProvider 
+  LiveblocksProvider,
+  defaultInitialStorage, 
+  SheetData
 } from "@/providers/LiveblocksProvider";
 import { LiveObject, LiveList } from "@liveblocks/client";
+
+interface Sheet {
+  id: string;
+  name: string;
+  updatedAt: string;
+  starred?: boolean;
+  shared?: boolean;
+}
 
 const DashboardContent = () => {
   const { user } = useUser();
@@ -74,8 +83,7 @@ const DashboardContent = () => {
   const [sheetToDelete, setSheetToDelete] = useState<string | null>(null);
   
   // Get sheets from Liveblocks storage
-  const storage = useStorage();
-  const sheets = useStorage(root => root.sheets);
+  const sheets = useStorage(root => root?.sheets);
   
   // Create a new sheet
   const createNewSheet = useMutation(({ storage }) => {
@@ -83,9 +91,9 @@ const DashboardContent = () => {
     const newId = `sheet-${Date.now()}`;
     
     // Create initial rows
-    const initialData = new LiveList();
+    const initialData = new LiveList<LiveList<string>>();
     for (let i = 0; i < 100; i++) {
-      const row = new LiveList();
+      const row = new LiveList<string>();
       // Fill row with empty cells
       for (let j = 0; j < 50; j++) {
         row.push("");
@@ -94,12 +102,14 @@ const DashboardContent = () => {
     }
     
     // Create the sheet object
-    const sheetObj = new LiveObject({
+    const sheetObj = new LiveObject<SheetData>({
       name: "Untitled Sheet",
       data: initialData,
       columns: 50,
       rows: 100,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      starred: false,
+      shared: false
     });
     
     // Add the new sheet to the sheets map
@@ -142,7 +152,7 @@ const DashboardContent = () => {
   }, []);
   
   // Filter sheets based on search query and convert to array for rendering
-  const filteredSheets = sheets ? 
+  const filteredSheets: Sheet[] = sheets ? 
     Array.from(sheets.entries())
       .map(([id, sheet]) => ({
         id,
@@ -220,7 +230,7 @@ const DashboardContent = () => {
     toggleStarred(id);
   };
   
-  const SheetItemActions = ({ sheet }: { sheet: typeof filteredSheets[0] }) => (
+  const SheetItemActions = ({ sheet }: { sheet: Sheet }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="icon">
@@ -790,6 +800,7 @@ const Dashboard = () => {
         lastName: user?.lastName || "",
         cursor: null
       }}
+      initialStorage={defaultInitialStorage}
     >
       <DashboardContent />
     </LiveblocksProvider>

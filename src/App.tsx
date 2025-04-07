@@ -11,7 +11,7 @@ import {
   useAuth,
   UserProfile
 } from "@clerk/clerk-react";
-import { LiveblocksProvider } from "./providers/LiveblocksProvider";
+import { LiveblocksProvider, defaultInitialStorage } from "./providers/LiveblocksProvider";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -40,7 +40,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <LiveblocksProvider>
+      <LiveblocksProvider initialStorage={defaultInitialStorage}>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />

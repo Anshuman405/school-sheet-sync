@@ -4,7 +4,8 @@ import {
   createClient,
   LiveList,
   LiveMap,
-  LiveObject
+  LiveObject,
+  Lson
 } from '@liveblocks/client';
 import { 
   RoomProvider,
@@ -18,34 +19,44 @@ const client = createClient({
 });
 
 // Create a type that represents Liveblocks' presence data
-type Presence = {
+export type Presence = {
   firstName?: string;
   lastName?: string;
   cursor: { x: number; y: number } | null;
 };
 
+// Sheet object type
+export type SheetData = {
+  name: string;
+  data: LiveList<LiveList<string>>;
+  columns: number;
+  rows: number;
+  updatedAt: string;
+  starred?: boolean;
+  shared?: boolean;
+};
+
 // Create a type that represents the shared storage for our spreadsheet
-type Storage = {
-  sheets: LiveMap<string, LiveObject<{
-    name: string;
-    data: LiveList<LiveList<string>>;
-    columns: number;
-    rows: number;
-    updatedAt: string;
-  }>>;
+export type Storage = {
+  sheets: LiveMap<string, LiveObject<SheetData>>;
 };
 
 // Create room context for using Liveblocks
 export const {
   RoomProvider: LiveblocksRoomProvider,
   useRoom,
-  useMyPresence,
-  useUpdateMyPresence,
+  useStorage,
   useOthers,
   useSelf,
-  useStorage,
+  useMyPresence,
+  useUpdateMyPresence,
   useMutation,
 } = createRoomContext<Presence, Storage>(client);
+
+// Default initial storage with empty sheets map
+export const defaultInitialStorage: Storage = {
+  sheets: new LiveMap()
+};
 
 interface LiveblocksProviderProps {
   children: ReactNode;
@@ -62,18 +73,13 @@ export const LiveblocksProvider = ({
     lastName: "",
     cursor: null
   },
-  initialStorage
+  initialStorage = defaultInitialStorage
 }: LiveblocksProviderProps) => {
-  // Create a properly typed LiveMap instance for the sheets
-  const defaultInitialStorage: Storage = {
-    sheets: new LiveMap()
-  };
-
   return (
     <LiveblocksRoomProvider
       id={roomId}
       initialPresence={initialPresence}
-      initialStorage={initialStorage || defaultInitialStorage}
+      initialStorage={initialStorage}
     >
       {children}
     </LiveblocksRoomProvider>
