@@ -37,41 +37,38 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   // Get sheet data from Liveblocks storage
   const sheet = useStorage((root) => {
     if (!root || !root.sheets) return undefined;
-    return root.sheets[sheetId];
+    return root.sheets.get(sheetId);
   });
-
-  // Default values for new sheets
-  const DEFAULT_COLUMNS = 50;
-  const DEFAULT_ROWS = 100;
 
   // Initialize a new sheet or load existing one from Liveblocks
   const initializeSheet = useMutation(({ storage, setMyPresence }) => {
-    if (!storage) return;
-  
+    if (!storage) {
+      console.error("Storage is not loaded yet.");
+      return;
+    }
+
     const sheets = storage.get("sheets");
     if (!sheets) {
       console.error("Sheets map is not initialized in Liveblocks storage.");
       return;
     }
-  
+
     if (!sheets.has(sheetId)) {
       // Create a new sheet if it doesn't exist
-      const initialData = Array.from({ length: DEFAULT_ROWS }, () =>
-        Array(DEFAULT_COLUMNS).fill("")
+      const initialData = Array.from({ length: 100 }, () =>
+        Array(50).fill("")
       );
-  
-      // Create the sheet object with name, data, columns, and rows
+
       const newSheet = {
         name: initialSheetName || "Untitled Sheet",
         data: initialData,
-        columns: DEFAULT_COLUMNS,
-        rows: DEFAULT_ROWS,
+        columns: 50,
+        rows: 100,
         updatedAt: new Date().toISOString(),
         starred: false,
         shared: false,
       };
-  
-      // Add the new sheet to the sheets map
+
       sheets.set(sheetId, newSheet);
     } else {
       // Update last accessed timestamp
@@ -80,7 +77,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
         existingSheet.updatedAt = new Date().toISOString();
       }
     }
-  
+
     // Set user presence
     setMyPresence({
       firstName: user?.firstName || "",
@@ -88,6 +85,15 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
       cursor: null,
     });
   }, [sheetId, initialSheetName, user]);
+
+  // Initialize sheet on first render
+  useEffect(() => {
+    if (!sheet) {
+      initializeSheet();
+    } else {
+      setIsLoading(false);
+    }
+  }, [sheet, initializeSheet]);
 
   // Handle cell changes
   const updateCell = useMutation(({ storage }, rowIndex: number, colIndex: number, value: string) => {
@@ -373,43 +379,124 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     setShareDialogOpen(false);
   };
 
-  return {
-    // State
-    isLoading,
-    sheet,
-    selectedCells,
-    activeCellFormat,
-    cellFormats,
-    isCopying,
-    shareDialogOpen,
-    shareEmail,
-    displayedCellValues,
-    isEditingTitle,
-    tempSheetName,
-    titleInputRef,
-    spreadsheetTableRef,
+    // Handle mouse down on a cell
+    const handleCellMouseDown = (row: number, col: number) => {
+      setSelectedCells({
+        startRow: row,
+        startCol: col,
+        endRow: row,
+        endCol: col,
+      });
+    };
+  
+    // Handle mouse over a cell (for selection)
+    const handleCellMouseOver = (row: number, col: number) => {
+      if (selectedCells) {
+        setSelectedCells({
+          ...selectedCells,
+          endRow: row,
+          endCol: col,
+        });
+      }
+    };
+  
+    // Handle mouse up on a cell (end selection)
+    const handleCellMouseUp = () => {
+      // Finalize the selection
+      if (selectedCells) {
+        console.log("Selected cells:", selectedCells);
+      }
+    };
+  
+    // Handle key down events (e.g., for navigation or editing)
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (!selectedCells) return;
+  
+      const { startRow, startCol, endRow, endCol } = selectedCells;
+  
+      switch (e.key) {
+        case "ArrowUp":
+          setSelectedCells({
+            startRow: Math.max(startRow - 1, 0),
+            startCol,
+            endRow: Math.max(endRow - 1, 0),
+            endCol,
+          });
+          break;
+        case "ArrowDown":
+          setSelectedCells({
+            startRow: startRow + 1,
+            startCol,
+            endRow: endRow + 1,
+            endCol,
+          });
+          break;
+        case "ArrowLeft":
+          setSelectedCells({
+            startRow,
+            startCol: Math.max(startCol - 1, 0),
+            endRow,
+            endCol: Math.max(endCol - 1, 0),
+          });
+          break;
+        case "ArrowRight":
+          setSelectedCells({
+            startRow,
+            startCol: startCol + 1,
+            endRow,
+            endCol: endCol + 1,
+          });
+          break;
+        case "Enter":
+          // Start editing the selected cell
+          console.log("Start editing cell:", startRow, startCol);
+          break;
+        default:
+          break;
+      }
+    }
 
-    // Actions
-    updateCell,
-    handleAddRow,
-    handleAddColumn,
-    handleRemoveRow,
-    handleRemoveColumn,
-    handleTitleClick,
-    handleTitleBlur,
-    handleTitleKeyDown,
-    handleFormatBold,
-    handleFormatAlign,
-    handleCopy,
-    handlePaste,
-    handleSave,
-    handleExport,
-    handleShare,
-    setTempSheetName,
-    setShareDialogOpen,
-    setShareEmail,
+    return {
+      // State
+      isLoading,
+      sheet,
+      selectedCells,
+      activeCellFormat,
+      cellFormats,
+      isCopying,
+      shareDialogOpen,
+      shareEmail,
+      displayedCellValues,
+      isEditingTitle,
+      tempSheetName,
+      titleInputRef,
+      spreadsheetTableRef,
 
-    // Navigation
-    goBack: () => navigate("/dashboard"),
-  };
-};
+      // Actions
+      updateCell,
+      handleAddRow,
+      handleAddColumn,
+      handleRemoveRow,
+      handleRemoveColumn,
+      handleTitleClick,
+      handleTitleBlur,
+      handleTitleKeyDown,
+      handleFormatBold,
+      handleFormatAlign,
+      handleCopy,
+      handlePaste,
+      handleSave,
+      handleExport,
+      handleShare,
+      setTempSheetName,
+      setShareDialogOpen,
+      setShareEmail,
+      handleCellMouseDown,
+      handleCellMouseOver,
+      handleCellMouseUp,
+      handleKeyDown,
+
+      // Navigation
+      goBack: () => navigate("/dashboard"),
+    };
+  }
