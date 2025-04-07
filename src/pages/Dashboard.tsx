@@ -55,31 +55,105 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import SpreadsheetEditor from "@/components/SpreadsheetEditor";
+import { 
+  useRoom, 
+  useStorage, 
+  useMutation, 
+  LiveblocksProvider 
+} from "@/providers/LiveblocksProvider";
+import { LiveObject, LiveList } from "@liveblocks/client";
 
-// Mock data for sheets
-const initialMockSheets = [
-  { id: "1", name: "Class 10B Grades", updatedAt: "2023-04-01T10:30:00Z", shared: true, starred: true },
-  { id: "2", name: "School Budget Q2", updatedAt: "2023-03-28T14:15:00Z", shared: true, starred: false },
-  { id: "3", name: "Student Attendance Log", updatedAt: "2023-03-25T09:45:00Z", shared: false, starred: true },
-  { id: "4", name: "Teacher Schedule", updatedAt: "2023-03-20T11:20:00Z", shared: true, starred: false },
-  { id: "5", name: "Curriculum Planning", updatedAt: "2023-03-15T13:10:00Z", shared: false, starred: false },
-];
-
-const Dashboard = () => {
+const DashboardContent = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   const { id: sheetId } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [mockSheets, setMockSheets] = useState(initialMockSheets);
   const [sheetToRename, setSheetToRename] = useState<{ id: string, name: string } | null>(null);
   const [newSheetName, setNewSheetName] = useState("");
   const [sheetToDelete, setSheetToDelete] = useState<string | null>(null);
   
-  // Filter sheets based on search query
-  const filteredSheets = mockSheets.filter(sheet => 
-    sheet.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get sheets from Liveblocks storage
+  const storage = useStorage();
+  const sheets = useStorage(root => root.sheets);
+  
+  // Create a new sheet
+  const createNewSheet = useMutation(({ storage }) => {
+    const sheets = storage.get("sheets");
+    const newId = `sheet-${Date.now()}`;
+    
+    // Create initial rows
+    const initialData = new LiveList();
+    for (let i = 0; i < 100; i++) {
+      const row = new LiveList();
+      // Fill row with empty cells
+      for (let j = 0; j < 50; j++) {
+        row.push("");
+      }
+      initialData.push(row);
+    }
+    
+    // Create the sheet object
+    const sheetObj = new LiveObject({
+      name: "Untitled Sheet",
+      data: initialData,
+      columns: 50,
+      rows: 100,
+      updatedAt: new Date().toISOString()
+    });
+    
+    // Add the new sheet to the sheets map
+    sheets.set(newId, sheetObj);
+    
+    return newId;
+  }, []);
+  
+  // Rename a sheet
+  const renameSheet = useMutation(({ storage }, sheetId: string, newName: string) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      sheet.update({
+        name: newName,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, []);
+  
+  // Delete a sheet
+  const deleteSheet = useMutation(({ storage }, sheetId: string) => {
+    const sheets = storage.get("sheets");
+    sheets.delete(sheetId);
+  }, []);
+  
+  // Toggle starred status
+  const toggleStarred = useMutation(({ storage }, sheetId: string) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      const isStarred = sheet.get("starred") || false;
+      sheet.update({
+        starred: !isStarred,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, []);
+  
+  // Filter sheets based on search query and convert to array for rendering
+  const filteredSheets = sheets ? 
+    Array.from(sheets.entries())
+      .map(([id, sheet]) => ({
+        id,
+        name: sheet.get("name"),
+        updatedAt: sheet.get("updatedAt"),
+        starred: sheet.get("starred") || false,
+        shared: sheet.get("shared") || false
+      }))
+      .filter(sheet => sheet.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    : [];
   
   // Format date to relative time
   const formatDate = (dateString: string) => {
@@ -99,17 +173,8 @@ const Dashboard = () => {
     }
   };
   
-  const createNewSheet = () => {
-    const newId = `new-${Date.now()}`;
-    const newSheet = {
-      id: newId,
-      name: "Untitled Sheet",
-      updatedAt: new Date().toISOString(),
-      shared: false,
-      starred: false
-    };
-    
-    setMockSheets([newSheet, ...mockSheets]);
+  const handleCreateNewSheet = () => {
+    const newId = createNewSheet();
     navigate(`/sheets/${newId}`);
     
     toast({
@@ -119,7 +184,7 @@ const Dashboard = () => {
   };
   
   const handleDeleteSheet = (id: string) => {
-    setMockSheets(mockSheets.filter(sheet => sheet.id !== id));
+    deleteSheet(id);
     setSheetToDelete(null);
     
     toast({
@@ -140,11 +205,7 @@ const Dashboard = () => {
       return;
     }
     
-    setMockSheets(mockSheets.map(sheet => 
-      sheet.id === sheetToRename.id 
-        ? { ...sheet, name: newSheetName } 
-        : sheet
-    ));
+    renameSheet(sheetToRename.id, newSheetName);
     
     setSheetToRename(null);
     setNewSheetName("");
@@ -155,15 +216,11 @@ const Dashboard = () => {
     });
   };
   
-  const toggleStarred = (id: string) => {
-    setMockSheets(mockSheets.map(sheet => 
-      sheet.id === id 
-        ? { ...sheet, starred: !sheet.starred } 
-        : sheet
-    ));
+  const handleToggleStarred = (id: string) => {
+    toggleStarred(id);
   };
   
-  const SheetItemActions = ({ sheet }: { sheet: typeof mockSheets[0] }) => (
+  const SheetItemActions = ({ sheet }: { sheet: typeof filteredSheets[0] }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="icon">
@@ -184,7 +241,7 @@ const Dashboard = () => {
         <DropdownMenuItem 
           onClick={(e) => {
             e.stopPropagation();
-            toggleStarred(sheet.id);
+            handleToggleStarred(sheet.id);
           }}
         >
           <Star className={`h-4 w-4 mr-2 ${sheet.starred ? "text-yellow-400" : ""}`} />
@@ -205,26 +262,19 @@ const Dashboard = () => {
     </DropdownMenu>
   );
   
-  // Save sheet updates when leaving
+  // Update timestamps when leaving a sheet to return to dashboard
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      // This would be where we save any changes to the backend
-      // For now we'll just update the mock data's updatedAt timestamp
-      if (sheetId) {
-        setMockSheets(mockSheets.map(sheet => 
-          sheet.id === sheetId 
-            ? { ...sheet, updatedAt: new Date().toISOString() } 
-            : sheet
-        ));
+    return () => {
+      if (sheetId && sheets && sheets.has(sheetId)) {
+        const sheet = sheets.get(sheetId);
+        if (sheet) {
+          sheet.update({
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
     };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      handleBeforeUnload(); // Run on component unmount too
-    };
-  }, [sheetId, mockSheets]);
+  }, [sheetId, sheets]);
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -254,7 +304,7 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center gap-4">
-            <Button onClick={createNewSheet} size="sm">
+            <Button onClick={handleCreateNewSheet} size="sm">
               <Plus className="mr-1 h-4 w-4" /> New Sheet
             </Button>
             
@@ -299,7 +349,7 @@ const Dashboard = () => {
           // Show spreadsheet editor when a sheet is selected
           <SpreadsheetEditor 
             sheetId={sheetId} 
-            initialSheetName={mockSheets.find(s => s.id === sheetId)?.name || "Untitled Sheet"}
+            initialSheetName={filteredSheets.find(s => s.id === sheetId)?.name}
           />
         ) : (
           // Show dashboard with sheets list
@@ -487,7 +537,7 @@ const Dashboard = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={() => toggleStarred(sheet.id)}
+                                  onClick={() => handleToggleStarred(sheet.id)}
                                 >
                                   <Star className={`h-4 w-4 ${sheet.starred ? "fill-yellow-400 text-yellow-400" : ""}`} />
                                 </Button>
@@ -554,7 +604,7 @@ const Dashboard = () => {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    onClick={() => toggleStarred(sheet.id)}
+                                    onClick={() => handleToggleStarred(sheet.id)}
                                   >
                                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                                   </Button>
@@ -621,7 +671,7 @@ const Dashboard = () => {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    onClick={() => toggleStarred(sheet.id)}
+                                    onClick={() => handleToggleStarred(sheet.id)}
                                   >
                                     <Star className={`h-4 w-4 ${sheet.starred ? "fill-yellow-400 text-yellow-400" : ""}`} />
                                   </Button>
@@ -725,6 +775,24 @@ const Dashboard = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+};
+
+const Dashboard = () => {
+  const { user } = useUser();
+  const userId = user?.id || "anonymous";
+  
+  return (
+    <LiveblocksProvider 
+      roomId={`user-${userId}`}
+      initialPresence={{
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        cursor: null
+      }}
+    >
+      <DashboardContent />
+    </LiveblocksProvider>
   );
 };
 

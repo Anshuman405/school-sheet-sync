@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -61,54 +62,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-// Mock data for initial sheets
-const mockSheetData = {
-  "1": {
-    name: "Class 10B Grades",
-    data: [
-      ["Student", "Math", "Science", "English", "Average"],
-      ["Emma Davis", "92", "88", "95", "91.7"],
-      ["Jacob Smith", "84", "90", "82", "85.3"],
-      ["Olivia Johnson", "78", "85", "90", "84.3"],
-      ["Noah Williams", "95", "82", "79", "85.3"],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-    ],
-    columns: 50,
-    rows: 100,
-  },
-  "2": {
-    name: "School Budget Q2",
-    data: [
-      ["Category", "January", "February", "March", "Total"],
-      ["Salaries", "45000", "45000", "45000", "135000"],
-      ["Supplies", "5200", "3800", "4100", "13100"],
-      ["Utilities", "2800", "2600", "2900", "8300"],
-      ["Maintenance", "1500", "3200", "1800", "6500"],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-      ["", "", "", "", ""],
-    ],
-    columns: 50,
-    rows: 100,
-  },
-};
-
 interface SpreadsheetEditorProps {
   sheetId: string;
   initialSheetName?: string;
@@ -119,14 +72,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   const { user } = useUser();
   const room = useRoom();
   const others = useOthers();
-  const [sheetName, setSheetName] = useState(initialSheetName || "Untitled Sheet");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempSheetName, setTempSheetName] = useState("");
-  const [data, setData] = useState<string[][]>([]);
-  const [columns, setColumns] = useState(50);
-  const [rows, setRows] = useState(100);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [shareEmail, setShareEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCells, setSelectedCells] = useState<{startRow: number, startCol: number, endRow: number, endCol: number} | null>(null);
   const [activeCellFormat, setActiveCellFormat] = useState<{
@@ -138,80 +85,222 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   });
   const [cellFormats, setCellFormats] = useState<Record<string, { bold: boolean; align: string }>>({});
   const [isCopying, setIsCopying] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  
   const titleInputRef = useRef<HTMLInputElement>(null);
   const spreadsheetTableRef = useRef<HTMLTableElement>(null);
   
-  // Initialize with mock data or from Liveblocks storage
-  useEffect(() => {
-    const initializeSheet = async () => {
-      setIsLoading(true);
-      
-      try {
-        // In a real app, we would load data from Liveblocks or another storage
-        if (mockSheetData[sheetId as keyof typeof mockSheetData]) {
-          const sheet = mockSheetData[sheetId as keyof typeof mockSheetData];
-          if (!initialSheetName) {
-            setSheetName(sheet.name);
-            setTempSheetName(sheet.name);
-          } else {
-            setTempSheetName(initialSheetName);
-          }
-          
-          // Ensure data has enough rows and columns
-          const initialData = sheet.data.slice();
-          // Fill with empty rows if needed
-          while (initialData.length < sheet.rows) {
-            initialData.push(Array(sheet.columns).fill(""));
-          }
-          
-          // Fill each row with empty cells if needed
-          for (let i = 0; i < initialData.length; i++) {
-            if (!initialData[i]) {
-              initialData[i] = Array(sheet.columns).fill("");
-            } else {
-              while (initialData[i].length < sheet.columns) {
-                initialData[i].push("");
-              }
-            }
-          }
-          
-          setData(initialData);
-          setColumns(sheet.columns);
-          setRows(sheet.rows);
-        } else if (sheetId.startsWith("new-")) {
-          // New sheet
-          setTempSheetName(initialSheetName || "Untitled Sheet");
-          
-          // Create a larger initial grid
-          const initialData = Array(rows).fill(null).map(() => Array(columns).fill(""));
-          setData(initialData);
-        }
-      } catch (error) {
-        console.error("Error loading sheet:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load sheet data.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Get sheet data from Liveblocks storage
+  const storage = useStorage();
+  const sheet = useStorage(root => root.sheets.get(sheetId));
+  
+  // Default values for new sheets
+  const DEFAULT_COLUMNS = 50;
+  const DEFAULT_ROWS = 100;
+  
+  // Initialize a new sheet or load existing one from Liveblocks
+  const initializeSheet = useMutation(({ storage, setMyPresence }) => {
+    const sheets = storage.get("sheets");
     
-    initializeSheet();
-  }, [sheetId, initialSheetName, columns, rows]);
+    if (!sheets.has(sheetId)) {
+      // Create a new sheet if it doesn't exist
+      const initialData = new LiveList();
+      
+      // Create initial rows
+      for (let i = 0; i < DEFAULT_ROWS; i++) {
+        const row = new LiveList();
+        // Fill row with empty cells
+        for (let j = 0; j < DEFAULT_COLUMNS; j++) {
+          row.push("");
+        }
+        initialData.push(row);
+      }
+      
+      // Create the sheet object with name, data, columns and rows
+      const sheetObj = new LiveObject({
+        name: initialSheetName || "Untitled Sheet",
+        data: initialData,
+        columns: DEFAULT_COLUMNS,
+        rows: DEFAULT_ROWS,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Add the new sheet to the sheets map
+      sheets.set(sheetId, sheetObj);
+    } else {
+      // Update last accessed timestamp
+      const existingSheet = sheets.get(sheetId);
+      if (existingSheet) {
+        existingSheet.update({
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+    
+    // Set user presence
+    setMyPresence({
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      cursor: null,
+    });
+  }, [sheetId, initialSheetName, user]);
   
   // Handle cell changes
-  const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
-    const newData = [...data];
-    if (!newData[rowIndex]) {
-      newData[rowIndex] = Array(columns).fill("");
-    }
-    newData[rowIndex][colIndex] = value;
-    setData(newData);
+  const updateCell = useMutation(({ storage }, rowIndex: number, colIndex: number, value: string) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
     
-    // In a real app, we would update Liveblocks storage here
-  };
+    if (sheet) {
+      const data = sheet.get("data");
+      if (data.length > rowIndex) {
+        const row = data.get(rowIndex);
+        if (row && row.length > colIndex) {
+          row.set(colIndex, value);
+          
+          // Update timestamp
+          sheet.update({
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+    }
+  }, [sheetId]);
+  
+  // Update sheet name
+  const updateSheetName = useMutation(({ storage }, newName: string) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      sheet.update({
+        name: newName,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, [sheetId]);
+  
+  // Add a new row
+  const addRow = useMutation(({ storage }, rowIndex: number) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      const data = sheet.get("data");
+      const columns = sheet.get("columns");
+      const rows = sheet.get("rows");
+      
+      // Create a new empty row
+      const newRow = new LiveList();
+      for (let i = 0; i < columns; i++) {
+        newRow.push("");
+      }
+      
+      // Insert the row at the specified index or at the end
+      if (rowIndex >= 0 && rowIndex < data.length) {
+        data.insert(rowIndex + 1, newRow);
+      } else {
+        data.push(newRow);
+      }
+      
+      // Update row count and timestamp
+      sheet.update({
+        rows: rows + 1,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, [sheetId]);
+  
+  // Remove a row
+  const removeRow = useMutation(({ storage }, rowIndex: number) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      const data = sheet.get("data");
+      const rows = sheet.get("rows");
+      
+      if (rowIndex >= 0 && rowIndex < data.length) {
+        data.delete(rowIndex);
+        
+        // Update row count and timestamp
+        sheet.update({
+          rows: rows - 1,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+  }, [sheetId]);
+  
+  // Add a new column
+  const addColumn = useMutation(({ storage }, colIndex: number) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      const data = sheet.get("data");
+      const columns = sheet.get("columns");
+      
+      // Add an empty cell to each row at the specified column index
+      for (let i = 0; i < data.length; i++) {
+        const row = data.get(i);
+        if (row) {
+          if (colIndex >= 0 && colIndex < row.length) {
+            row.insert(colIndex + 1, "");
+          } else {
+            row.push("");
+          }
+        }
+      }
+      
+      // Update column count and timestamp
+      sheet.update({
+        columns: columns + 1,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, [sheetId]);
+  
+  // Remove a column
+  const removeColumn = useMutation(({ storage }, colIndex: number) => {
+    const sheets = storage.get("sheets");
+    const sheet = sheets.get(sheetId);
+    
+    if (sheet) {
+      const data = sheet.get("data");
+      const columns = sheet.get("columns");
+      
+      if (colIndex >= 0 && colIndex < columns) {
+        // Remove the cell at the specified column index from each row
+        for (let i = 0; i < data.length; i++) {
+          const row = data.get(i);
+          if (row && colIndex < row.length) {
+            row.delete(colIndex);
+          }
+        }
+        
+        // Update column count and timestamp
+        sheet.update({
+          columns: columns - 1,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+  }, [sheetId]);
+  
+  // Initialize sheet on first render
+  useEffect(() => {
+    setIsLoading(true);
+    
+    if (storage && !sheet) {
+      initializeSheet();
+    }
+    
+    if (sheet) {
+      setTempSheetName(sheet.get("name"));
+      setIsLoading(false);
+    }
+  }, [storage, sheet, initializeSheet]);
   
   // Generate column labels (A, B, C, etc.)
   const getColumnLabel = (index: number) => {
@@ -250,22 +339,41 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Handle save button click
   const handleSave = () => {
-    // In a real app, this would save to a database
+    // Liveblocks already saves automatically, this is just for UX feedback
     toast({
       title: "Saved!",
-      description: "Your sheet has been saved.",
+      description: "Your sheet has been saved automatically.",
     });
   };
   
   // Handle export as CSV
   const handleExport = () => {
+    if (!sheet) return;
+    
     try {
-      const csvContent = data.map(row => row.join(",")).join("\n");
+      const data = sheet.get("data");
+      const csvRows: string[] = [];
+      
+      // Convert data to CSV format
+      for (let i = 0; i < data.length; i++) {
+        const row = data.get(i);
+        if (row) {
+          const csvRow: string[] = [];
+          for (let j = 0; j < row.length; j++) {
+            const cell = row.get(j) || "";
+            // Escape quotes and handle commas
+            csvRow.push(`"${cell.replace(/"/g, '""')}"`);
+          }
+          csvRows.push(csvRow.join(","));
+        }
+      }
+      
+      const csvContent = csvRows.join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `${sheetName}.csv`);
+      link.setAttribute("download", `${sheet.get("name")}.csv`);
       link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
@@ -287,19 +395,15 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Add a new row
   const handleAddRow = () => {
+    if (!sheet) return;
+    
     if (selectedCells) {
       // Insert a row after the last selected row
       const rowIndex = Math.max(selectedCells.startRow, selectedCells.endRow);
-      const newData = [...data];
-      newData.splice(rowIndex + 1, 0, Array(columns).fill(""));
-      setData(newData);
-      setRows(rows + 1);
+      addRow(rowIndex);
     } else {
       // Just add at the end
-      const newData = [...data];
-      newData.push(Array(columns).fill(""));
-      setData(newData);
-      setRows(rows + 1);
+      addRow(sheet.get("data").length - 1);
     }
     
     toast({
@@ -320,10 +424,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     }
     
     const rowIndex = Math.max(selectedCells.startRow, selectedCells.endRow);
-    const newData = [...data];
-    newData.splice(rowIndex, 1);
-    setData(newData);
-    setRows(rows - 1);
+    removeRow(rowIndex);
     setSelectedCells(null);
     
     toast({
@@ -334,25 +435,15 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Add a new column
   const handleAddColumn = () => {
+    if (!sheet) return;
+    
     if (selectedCells) {
       // Insert a column after the last selected column
       const colIndex = Math.max(selectedCells.startCol, selectedCells.endCol);
-      const newData = data.map(row => {
-        const newRow = [...row];
-        newRow.splice(colIndex + 1, 0, "");
-        return newRow;
-      });
-      setData(newData);
-      setColumns(columns + 1);
+      addColumn(colIndex);
     } else {
       // Just add at the end
-      const newData = data.map(row => {
-        const newRow = [...row];
-        newRow.push("");
-        return newRow;
-      });
-      setData(newData);
-      setColumns(columns + 1);
+      addColumn(sheet.get("columns") - 1);
     }
     
     toast({
@@ -373,13 +464,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     }
     
     const colIndex = Math.max(selectedCells.startCol, selectedCells.endCol);
-    const newData = data.map(row => {
-      const newRow = [...row];
-      newRow.splice(colIndex, 1);
-      return newRow;
-    });
-    setData(newData);
-    setColumns(columns - 1);
+    removeColumn(colIndex);
     setSelectedCells(null);
     
     toast({
@@ -390,8 +475,10 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Start editing the sheet title
   const handleTitleClick = () => {
+    if (!sheet) return;
+    
     setIsEditingTitle(true);
-    setTempSheetName(sheetName);
+    setTempSheetName(sheet.get("name"));
     // Focus the input after rendering
     setTimeout(() => {
       if (titleInputRef.current) {
@@ -404,7 +491,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   // Save the new sheet title
   const handleTitleSave = () => {
     if (tempSheetName.trim()) {
-      setSheetName(tempSheetName);
+      updateSheetName(tempSheetName);
       setIsEditingTitle(false);
       
       toast({
@@ -413,7 +500,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       });
     } else {
       // Don't allow empty sheet names
-      setTempSheetName(sheetName);
+      if (sheet) {
+        setTempSheetName(sheet.get("name"));
+      }
       setIsEditingTitle(false);
       
       toast({
@@ -517,7 +606,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Copy selected cells to clipboard
   const handleCopy = () => {
-    if (!selectedCells) return;
+    if (!selectedCells || !sheet) return;
     
     const minRow = Math.min(selectedCells.startRow, selectedCells.endRow);
     const maxRow = Math.max(selectedCells.startRow, selectedCells.endRow);
@@ -525,13 +614,18 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     const maxCol = Math.max(selectedCells.startCol, selectedCells.endCol);
     
     let copyText = '';
+    const data = sheet.get("data");
     
     for (let r = minRow; r <= maxRow; r++) {
       const rowData = [];
-      for (let c = minCol; c <= maxCol; c++) {
-        rowData.push(data[r]?.[c] || '');
+      const row = data.get(r);
+      
+      if (row) {
+        for (let c = minCol; c <= maxCol; c++) {
+          rowData.push(row.get(c) || '');
+        }
+        copyText += rowData.join('\t') + '\n';
       }
-      copyText += rowData.join('\t') + '\n';
     }
     
     navigator.clipboard.writeText(copyText).then(() => {
@@ -552,9 +646,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Paste from clipboard
   const handlePaste = async () => {
+    if (!selectedCells || !sheet) return;
+    
     try {
-      if (!selectedCells) return;
-      
       const clipboardText = await navigator.clipboard.readText();
       const pasteRows = clipboardText.split('\n').filter(row => row.trim() !== '');
       
@@ -562,8 +656,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       const targetRow = selectedCells.startRow;
       const targetCol = selectedCells.startCol;
-      
-      const newData = [...data];
+      const data = sheet.get("data");
       
       pasteRows.forEach((rowText, rowOffset) => {
         const rowCells = rowText.split('\t');
@@ -571,16 +664,15 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
           const pasteRowIdx = targetRow + rowOffset;
           const pasteColIdx = targetCol + colOffset;
           
-          if (pasteRowIdx < rows && pasteColIdx < columns) {
-            if (!newData[pasteRowIdx]) {
-              newData[pasteRowIdx] = Array(columns).fill('');
+          if (pasteRowIdx < data.length) {
+            const row = data.get(pasteRowIdx);
+            if (row && pasteColIdx < row.length) {
+              updateCell(pasteRowIdx, pasteColIdx, cellValue);
             }
-            newData[pasteRowIdx][pasteColIdx] = cellValue;
           }
         });
       });
       
-      setData(newData);
       setIsCopying(false);
       
       toast({
@@ -607,22 +699,25 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     } else if (e.ctrlKey && e.key === 'v') {
       handlePaste();
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (selectedCells) {
+      if (selectedCells && sheet) {
         const minRow = Math.min(selectedCells.startRow, selectedCells.endRow);
         const maxRow = Math.max(selectedCells.startRow, selectedCells.endRow);
         const minCol = Math.min(selectedCells.startCol, selectedCells.endCol);
         const maxCol = Math.max(selectedCells.startCol, selectedCells.endCol);
         
-        const newData = [...data];
+        const data = sheet.get("data");
+        
         for (let r = minRow; r <= maxRow; r++) {
-          for (let c = minCol; c <= maxCol; c++) {
-            if (newData[r] && newData[r][c] !== undefined) {
-              newData[r][c] = '';
+          const row = data.get(r);
+          if (row) {
+            for (let c = minCol; c <= maxCol; c++) {
+              if (c < row.length) {
+                updateCell(r, c, '');
+              }
             }
           }
         }
         
-        setData(newData);
         toast({
           title: "Cells cleared",
           description: "Selected cells have been cleared.",
@@ -659,7 +754,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     }
   }, [selectedCells]);
   
-  if (isLoading) {
+  if (isLoading || !sheet) {
     return (
       <div className="flex items-center justify-center h-full py-12">
         <div className="text-center">
@@ -688,7 +783,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
                 if (e.key === 'Enter') {
                   handleTitleSave();
                 } else if (e.key === 'Escape') {
-                  setTempSheetName(sheetName);
+                  if (sheet) {
+                    setTempSheetName(sheet.get("name"));
+                  }
                   setIsEditingTitle(false);
                 }
               }}
@@ -701,7 +798,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
             onClick={handleTitleClick}
           >
             <span className="flex items-center gap-1">
-              {sheetName}
+              {sheet.get("name")}
               <Edit className="h-3.5 w-3.5 text-muted-foreground opacity-70" />
             </span>
           </h1>
@@ -716,7 +813,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
             {/* Show online users from Liveblocks */}
             {others.map(user => {
               // Safely handle potentially undefined or non-string values
-              const firstName = typeof user.info?.firstName === 'string' ? user.info.firstName : '';
+              const firstName = typeof user.presence.firstName === 'string' ? user.presence.firstName : '';
               return (
                 <div 
                   key={user.connectionId} 
@@ -881,7 +978,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
             <thead>
               <tr>
                 <th className="w-16 bg-muted text-muted-foreground">#</th>
-                {Array.from({ length: columns }, (_, i) => (
+                {Array.from({ length: sheet.get("columns") }, (_, i) => (
                   <th key={i} className="w-16 bg-muted text-muted-foreground">
                     {getColumnLabel(i)}
                   </th>
@@ -889,45 +986,58 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
               </tr>
             </thead>
             <tbody>
-              {data.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  <td className="w-16 bg-muted text-muted-foreground">{rowIndex + 1}</td>
-                  {row.map((cellValue, colIndex) => (
-                    <td 
-                      key={colIndex} 
-                      data-row={rowIndex} 
-                      data-col={colIndex}
-                      className={`border p-2 ${isCellSelected(rowIndex, colIndex) ? 'bg-accent' : ''}`}
-                      style={getCellStyle(rowIndex, colIndex)}
-                      onMouseDown={() => handleCellMouseDown(rowIndex, colIndex)}
-                      onMouseOver={() => handleCellMouseOver(rowIndex, colIndex)}
-                      onMouseUp={handleCellMouseUp}
-                    >
-                      <input 
-                        type="text" 
-                        value={cellValue} 
-                        onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)} 
-                        className="w-full h-full bg-transparent border-none outline-none"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {Array.from({ length: sheet.get("rows") }, (_, rowIndex) => {
+                const row = sheet.get("data").get(rowIndex);
+                
+                return (
+                  <tr key={rowIndex}>
+                    <td className="w-16 bg-muted text-muted-foreground">{rowIndex + 1}</td>
+                    {Array.from({ length: sheet.get("columns") }, (_, colIndex) => {
+                      const cellValue = row ? (row.get(colIndex) || "") : "";
+                      
+                      return (
+                        <td 
+                          key={colIndex} 
+                          data-row={rowIndex} 
+                          data-col={colIndex}
+                          className={`border p-2 ${isCellSelected(rowIndex, colIndex) ? 'bg-accent' : ''}`}
+                          style={getCellStyle(rowIndex, colIndex)}
+                          onMouseDown={() => handleCellMouseDown(rowIndex, colIndex)}
+                          onMouseOver={() => handleCellMouseOver(rowIndex, colIndex)}
+                          onMouseUp={handleCellMouseUp}
+                        >
+                          <input 
+                            type="text" 
+                            value={cellValue} 
+                            onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)} 
+                            className="w-full h-full bg-transparent border-none outline-none"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
     </div>
   );
-}
+};
+
 export default function SpreadsheetEditor({ sheetId, initialSheetName }: SpreadsheetEditorProps) {
   const { user } = useUser();
-  const room = useRoom();
-  const myPresence = useMyPresence();
-  const self = useSelf();
   
   return (
-    <LiveblocksRoomProvider id={sheetId} userId={user?.id || ""} userInfo={{ firstName: user?.firstName || "", lastName: user?.lastName || "" }}>
+    <LiveblocksRoomProvider 
+      id={sheetId} 
+      initialPresence={{
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        cursor: null
+      }}
+    >
       <SpreadsheetEditorContent sheetId={sheetId} initialSheetName={initialSheetName} />
     </LiveblocksRoomProvider>
   );

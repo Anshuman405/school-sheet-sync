@@ -31,6 +31,7 @@ type Storage = {
     data: LiveList<LiveList<string>>;
     columns: number;
     rows: number;
+    updatedAt: string;
   }>>;
 };
 
@@ -65,15 +66,7 @@ export const LiveblocksProvider = ({
 }: LiveblocksProviderProps) => {
   // Create a properly typed LiveMap instance for the sheets
   const defaultInitialStorage: Storage = {
-    sheets: new LiveMap<
-      string, 
-      LiveObject<{
-        name: string;
-        data: LiveList<LiveList<string>>;
-        columns: number;
-        rows: number;
-      }>
-    >()
+    sheets: new LiveMap()
   };
 
   return (
