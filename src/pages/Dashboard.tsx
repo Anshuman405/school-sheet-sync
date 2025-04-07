@@ -90,37 +90,31 @@ const DashboardContent = () => {
   // Create a new sheet
   const createNewSheet = useMutation(({ storage }) => {
     if (!storage) return null;
-    
+  
     const sheets = storage.get("sheets");
     if (!sheets) return null;
-    
+  
     const newId = `sheet-${Date.now()}`;
-    
-    // Create initial rows
-    const initialData = new LiveList<LiveList<string>>();
-    for (let i = 0; i < 100; i++) {
-      const row = new LiveList<string>();
-      // Fill row with empty cells
-      for (let j = 0; j < 50; j++) {
-        row.push("");
-      }
-      initialData.push(row);
-    }
-    
+  
+    // Create initial rows as a 2D array
+    const initialData = Array.from({ length: 100 }, () =>
+      Array(50).fill("")
+    );
+  
     // Create the sheet object
-    const sheetObj = new LiveObject<SheetData>({
+    const sheetObj = {
       name: "Untitled Sheet",
       data: initialData,
       columns: 50,
       rows: 100,
       updatedAt: new Date().toISOString(),
       starred: false,
-      shared: false
-    });
-    
+      shared: false,
+    };
+  
     // Add the new sheet to the sheets map
     sheets.set(newId, sheetObj);
-    
+  
     return newId;
   }, []);
   

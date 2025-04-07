@@ -1,11 +1,7 @@
-
 import { ReactNode } from 'react';
 import { 
   createClient,
-  LiveList,
   LiveMap,
-  LiveObject,
-  Lson
 } from '@liveblocks/client';
 import { 
   RoomProvider,
@@ -28,7 +24,7 @@ export type Presence = {
 // Sheet object type
 export type SheetData = {
   name: string;
-  data: LiveList<LiveList<string>>;
+  data: string[][]; // Use a 2D array for rows and cells
   columns: number;
   rows: number;
   updatedAt: string;
@@ -38,7 +34,7 @@ export type SheetData = {
 
 // Create a type that represents the shared storage for our spreadsheet
 export type Storage = {
-  sheets: LiveMap<string, LiveObject<SheetData>>;
+  sheets: LiveMap<string, SheetData>; // Use plain objects for sheets
 };
 
 // Create room context for using Liveblocks

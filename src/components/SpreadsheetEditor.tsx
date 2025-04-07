@@ -19,7 +19,7 @@ interface SpreadsheetEditorProps {
 const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEditorProps) => {
   const {
     isLoading,
-    sheetData,
+    sheet,
     selectedCells,
     activeCellFormat,
     cellFormats,
@@ -75,7 +75,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
         </Button>
         
         <SpreadsheetToolbar
-          sheetName={sheetData.name}
+          sheetName={sheet.name}
           isEditingTitle={isEditingTitle}
           tempSheetName={tempSheetName}
           titleInputRef={titleInputRef}
@@ -111,9 +111,9 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
       
       <SpreadsheetGrid
         spreadsheetTableRef={spreadsheetTableRef}
-        sheetColumns={sheetData.columns}
-        sheetRows={sheetData.rows}
-        sheetData={sheetData.data}
+        sheetColumns={sheet.columns}
+        sheetRows={sheet.rows}
+        sheetData={sheet.data}
         displayedCellValues={displayedCellValues}
         cellFormats={cellFormats}
         selectedCells={selectedCells}

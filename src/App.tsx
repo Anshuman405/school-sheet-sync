@@ -84,15 +84,13 @@ const App = () => (
                         </div>
                       </header>
                       
-                      <main className="flex-1 container py-6 justify-center">
+                      <main className="flex py-6 justify-center">
                         <UserProfile 
                           appearance={{
                             elements: {
                               navbarMobileMenuButton: "hidden",
                             }
                           }}
-                          routing="path"
-                          path="/account"
                         />
                       </main>
                     </div>
