@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useRef, CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { 
   useRoom, 
@@ -104,8 +104,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   
   // Get sheet data from Liveblocks storage
   const sheet = useStorage(root => {
-    if (!root) return undefined;
-    return root.sheets?.get(sheetId);
+    if (!root || !root.sheets) return undefined;
+    return root.sheets.get(sheetId);
   });
   
   // Default values for new sheets
@@ -354,7 +354,8 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     if (!sheet) return "";
     
     try {
-      const data = sheet.toObject().data;
+      const sheetObj = sheet.toObject();
+      const data = sheetObj.data;
       if (!data || rowIndex >= data.length) return "";
       
       const row = data[rowIndex];
@@ -778,7 +779,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     
     return {
       fontWeight: format.bold ? 'bold' : 'normal',
-      textAlign: format.align
+      textAlign: format.align as TextAlign
     };
   };
   
@@ -951,11 +952,20 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
   }
   
   // Safely get sheet properties with fallbacks
-  const sheetObj = sheet.toObject();
-  const sheetName = sheetObj.name || "Untitled Sheet";
-  const sheetColumns = sheetObj.columns || DEFAULT_COLUMNS;
-  const sheetRows = sheetObj.rows || DEFAULT_ROWS;
-  const sheetData = sheetObj.data || [];
+  let sheetName = "Untitled Sheet";
+  let sheetColumns = DEFAULT_COLUMNS;
+  let sheetRows = DEFAULT_ROWS;
+  let sheetData: any[] = [];
+  
+  try {
+    const sheetObj = sheet.toObject();
+    sheetName = sheetObj.name || "Untitled Sheet";
+    sheetColumns = sheetObj.columns || DEFAULT_COLUMNS;
+    sheetRows = sheetObj.rows || DEFAULT_ROWS;
+    sheetData = sheetObj.data || [];
+  } catch (error) {
+    console.error("Error accessing sheet properties:", error);
+  }
   
   return (
     <div className="space-y-4" tabIndex={-1} onKeyDown={handleKeyDown}>
