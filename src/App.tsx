@@ -51,7 +51,7 @@ const App = () => (
               
               {/* Protected routes - Note: No LiveblocksProvider here as it's handled in Dashboard component */}
               <Route 
-                path="/dashboard" 
+                path="/dashboard/*" 
                 element={
                   <ProtectedRoute>
                     <Dashboard />
