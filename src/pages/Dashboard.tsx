@@ -370,6 +370,9 @@ const DashboardContent = () => {
                   {user?.primaryEmailAddress?.emailAddress}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                  Dashboard
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/account")}>
                   Account Settings
                 </DropdownMenuItem>

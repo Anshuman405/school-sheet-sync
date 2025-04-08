@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -60,6 +59,7 @@ interface SpreadsheetToolbarProps {
   isCopying: boolean;
   shareDialogOpen: boolean;
   shareEmail: string;
+  formulaInput: string;
   onTitleChange: (value: string) => void;
   onTitleSave: () => void;
   onTitleClick: () => void;
@@ -78,6 +78,8 @@ interface SpreadsheetToolbarProps {
   onShareOpen: (open: boolean) => void;
   onShareEmailChange: (value: string) => void;
   onShare: () => void;
+  onFormulaChange: (value: string) => void;
+  onFormulaSubmit: () => void;
 }
 
 const SpreadsheetToolbar: React.FC<SpreadsheetToolbarProps> = ({
@@ -90,6 +92,7 @@ const SpreadsheetToolbar: React.FC<SpreadsheetToolbarProps> = ({
   isCopying,
   shareDialogOpen,
   shareEmail,
+  formulaInput,
   onTitleChange,
   onTitleSave,
   onTitleClick,
@@ -108,181 +111,91 @@ const SpreadsheetToolbar: React.FC<SpreadsheetToolbarProps> = ({
   onShareOpen,
   onShareEmailChange,
   onShare,
+  onFormulaChange,
+  onFormulaSubmit,
 }) => {
   return (
-    <>
-      {isEditingTitle ? (
-        <div className="flex items-center gap-2">
-          <Input
-            ref={titleInputRef}
-            value={tempSheetName}
-            onChange={(e) => onTitleChange(e.target.value)}
-            onBlur={onTitleBlur}
-            onKeyDown={onTitleKeyDown}
-            className="w-60 h-8 font-semibold text-xl"
-          />
-        </div>
-      ) : (
-        <h1 
-          className="text-xl font-semibold cursor-pointer hover:bg-muted px-2 py-1 rounded"
-          onClick={onTitleClick}
-        >
-          <span className="flex items-center gap-1">
-            {sheetName}
-            <Edit className="h-3.5 w-3.5 text-muted-foreground opacity-70" />
-          </span>
-        </h1>
-      )}
-    
-      <div className="p-3 border-b bg-muted/30 flex flex-wrap gap-2 rounded-t-lg border-t border-x">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline" className="h-8">
-              <Plus size={16} className="mr-1" /> Add <ChevronDown className="h-3.5 w-3.5 ml-1" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-0" align="start">
-            <div className="flex flex-col">
-              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={onAddRow}>
-                <Plus size={14} className="mr-2" /> Add Row
-              </Button>
-              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={onAddColumn}>
-                <Plus size={14} className="mr-2" /> Add Column
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline" className="h-8">
-              <Trash2 size={16} className="mr-1" /> Remove <ChevronDown className="h-3.5 w-3.5 ml-1" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-0" align="start">
-            <div className="flex flex-col">
-              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={onRemoveRow}>
-                <MinusSquare size={14} className="mr-2" /> Remove Row
-              </Button>
-              <Button variant="ghost" className="justify-start rounded-none h-9 px-3" onClick={onRemoveColumn}>
-                <MinusSquare size={14} className="mr-2" /> Remove Column
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Separator orientation="vertical" className="h-8" />
-        
-        <Button 
-          size="sm" 
-          variant={activeCellFormat.bold ? "default" : "outline"} 
-          className="h-8 px-2 w-9"
-          onClick={onFormatBold}
-        >
-          <Bold size={16} />
+    <div className="flex flex-wrap items-center gap-4">
+      {/* Formula Input */}
+      <div className="flex items-center gap-2">
+        <Input
+          value={formulaInput}
+          onChange={(e) => onFormulaChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onFormulaSubmit()}
+          placeholder="Enter formula (e.g., =A1+B2)"
+          className="w-64"
+        />
+        <Button size="sm" variant="outline" onClick={onFormulaSubmit}>
+          Apply
         </Button>
-        <Button 
-          size="sm" 
-          variant={activeCellFormat.align === 'left' ? "default" : "outline"} 
-          className="h-8 px-2 w-9"
-          onClick={() => onFormatAlign('left')}
-        >
-          <AlignLeft size={16} />
-        </Button>
-        <Button 
-          size="sm" 
-          variant={activeCellFormat.align === 'center' ? "default" : "outline"} 
-          className="h-8 px-2 w-9"
-          onClick={() => onFormatAlign('center')}
-        >
-          <AlignCenter size={16} />
-        </Button>
-        <Button 
-          size="sm" 
-          variant={activeCellFormat.align === 'right' ? "default" : "outline"} 
-          className="h-8 px-2 w-9"
-          onClick={() => onFormatAlign('right')}
-        >
-          <AlignRight size={16} />
-        </Button>
-        
-        <Separator orientation="vertical" className="h-8" />
-        
-        <div className="flex items-center">
-          <Calculator size={16} className="mr-1 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Formulas: Start with = (e.g., =A1+B2)</span>
-        </div>
-        
-        <Separator orientation="vertical" className="h-8" />
-        
-        {selectedCells && (
-          <>
-            <Button size="sm" variant="outline" className="h-8" onClick={onCopy}>
-              <Copy size={16} className="mr-1" /> Copy
-            </Button>
-            {isCopying && (
-              <Button size="sm" variant="outline" className="h-8" onClick={onPaste}>
-                <Clipboard size={16} className="mr-1" /> Paste
-              </Button>
-            )}
-          </>
-        )}
-        
-        <div className="ml-auto">
-          <Button size="sm" variant="outline" className="h-8 mr-2" onClick={onSave}>
-            <Save size={16} className="mr-1" /> Save
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 mr-2" onClick={onExport}>
-            <Download size={16} className="mr-1" /> Export
-          </Button>
-          <Dialog open={shareDialogOpen} onOpenChange={onShareOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 mr-2">
-                <Share2 size={16} className="mr-1" /> Share
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Share this sheet</DialogTitle>
-                <DialogDescription>
-                  Enter an email address to invite someone to collaborate.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Label htmlFor="email" className="mb-2 block">Email address</Label>
-                <Input 
-                  id="email" 
-                  placeholder="colleague@school.edu" 
-                  value={shareEmail}
-                  onChange={(e) => onShareEmailChange(e.target.value)}
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => onShareOpen(false)}>Cancel</Button>
-                <Button onClick={onShare}>Share</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" className="h-8">
-                <Settings size={16} className="mr-1" /> 
-                <ChevronDown size={14} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Sheet Options</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onTitleClick}>Rename</DropdownMenuItem>
-              <DropdownMenuItem>Duplicate</DropdownMenuItem>
-              <DropdownMenuItem>Format cells</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
-    </>
+
+      {/* Formatting Section */}
+      <div className="flex items-center gap-2 border-l pl-4">
+        <span className="text-sm font-medium text-muted-foreground">Formatting:</span>
+        <Button size="sm" variant={activeCellFormat.bold ? "default" : "outline"} onClick={onFormatBold}>
+          <Bold size={16} /> Bold
+        </Button>
+        <Button size="sm" variant={activeCellFormat.align === "left" ? "default" : "outline"} onClick={() => onFormatAlign("left")}>
+          <AlignLeft size={16} /> Left
+        </Button>
+        <Button size="sm" variant={activeCellFormat.align === "center" ? "default" : "outline"} onClick={() => onFormatAlign("center")}>
+          <AlignCenter size={16} /> Center
+        </Button>
+        <Button size="sm" variant={activeCellFormat.align === "right" ? "default" : "outline"} onClick={() => onFormatAlign("right")}>
+          <AlignRight size={16} /> Right
+        </Button>
+      </div>
+
+      {/* Row/Column Management */}
+      <div className="flex items-center gap-2 border-l pl-4">
+        <span className="text-sm font-medium text-muted-foreground">Rows/Columns:</span>
+        <Button size="sm" variant="outline" onClick={onAddRow}>
+          Add Row
+        </Button>
+        <Button size="sm" variant="outline" onClick={onAddColumn}>
+          Add Column
+        </Button>
+        <Button size="sm" variant="outline" onClick={onRemoveRow}>
+          Remove Row
+        </Button>
+        <Button size="sm" variant="outline" onClick={onRemoveColumn}>
+          Remove Column
+        </Button>
+      </div>
+
+      {/* File Actions */}
+      <div className="flex items-center gap-2 border-l pl-4 ml-auto">
+        <span className="text-sm font-medium text-muted-foreground">File:</span>
+        <Button size="sm" variant="outline" onClick={onSave}>
+          Save
+        </Button>
+        <Button size="sm" variant="outline" onClick={onExport}>
+          Export
+        </Button>
+        <Dialog open={shareDialogOpen} onOpenChange={onShareOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              Share
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share this sheet</DialogTitle>
+              <DialogDescription>Enter an email address to invite someone to collaborate.</DialogDescription>
+            </DialogHeader>
+            <Input
+              value={shareEmail}
+              onChange={(e) => onShareEmailChange(e.target.value)}
+              placeholder="Email address"
+            />
+            <DialogFooter>
+              <Button onClick={onShare}>Share</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 };
 

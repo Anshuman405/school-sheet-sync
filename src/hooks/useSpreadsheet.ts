@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -36,6 +35,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
   const [displayedCellValues, setDisplayedCellValues] = useState<Record<string, string>>({});
+  const [formulaInput, setFormulaInput] = useState("");
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const spreadsheetTableRef = useRef<HTMLTableElement>(null);
@@ -220,13 +220,13 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     }
   }, [sheetId]);
 
-  // Recalculate all formulas in the sheet
+  // Simplify formula recalculation logic
   const recalculateAllFormulas = () => {
     if (!sheet) return;
 
     try {
       const newDisplayedValues: Record<string, string> = {};
-      const data = sheet.get("data");
+      const data = sheet.data;
 
       data.forEach((row: string[], rowIndex: number) => {
         row.forEach((cellValue: string, colIndex: number) => {
@@ -252,13 +252,13 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     }
 
     if (sheet) {
-      setTempSheetName(sheet.get("name") || "Untitled Sheet");
+      setTempSheetName(sheet.name || "Untitled Sheet");
       recalculateAllFormulas();
       setIsLoading(false);
     }
   }, [sheet, initializeSheet]);
 
-  // Recalculate formulas whenever sheet data changes
+  // Ensure formulas are recalculated on data change
   useEffect(() => {
     if (sheet) {
       recalculateAllFormulas();
@@ -268,14 +268,14 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   // Add a new row
   const handleAddRow = () => {
     if (!sheet) return;
-    const rowIndex = sheet.get("rows") - 1;
+    const rowIndex = sheet.rows - 1;
     addRow(rowIndex);
   };
 
   // Add a new column
   const handleAddColumn = () => {
     if (!sheet) return;
-    const colIndex = sheet.get("columns") - 1;
+    const colIndex = sheet.columns - 1;
     addColumn(colIndex);
   };
 
@@ -350,7 +350,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!selectedCells || !sheet) return;
 
     const copiedData = [];
-    const data = sheet.get("data");
+    const data = sheet.data
     
     for (let row = selectedCells.startRow; row <= selectedCells.endRow; row++) {
       const rowData = [];
@@ -374,7 +374,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
       const clipboardData = await navigator.clipboard.readText();
       const rows = clipboardData.split("\n").map((row) => row.split("\t"));
 
-      const currentData = [...sheet.get("data")];
+      const currentData = [...sheet.data];
       rows.forEach((row, rowIndex) => {
         row.forEach((cell, colIndex) => {
           const targetRow = selectedCells.startRow + rowIndex;
@@ -398,7 +398,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
           sheetObj.set("data", currentData);
           sheetObj.set("updatedAt", new Date().toISOString());
         }
-      })();
+      }, [sheetId, currentData])
       
       toast({ title: "Pasted from clipboard", description: "Data has been pasted into the sheet." });
     } catch (error) {
@@ -417,13 +417,13 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   const handleExport = () => {
     if (!sheet) return;
 
-    const data = sheet.get("data");
+    const data = sheet.data;
     const csvContent = data.map((row: string[]) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `${sheet.get("name") || "sheet"}.csv`);
+    link.setAttribute("download", `${sheet.name || "sheet"}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -432,7 +432,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     toast({ title: "Exported", description: "Your sheet has been exported as a CSV file." });
   };
 
-  // Handle sharing the sheet
+  // Handle sharing functionality
   const handleShare = () => {
     if (!shareEmail) {
       toast({ title: "Error", description: "Please enter an email to share the sheet.", variant: "destructive" });
@@ -442,6 +442,23 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     // Simulate sharing logic
     toast({ title: "Shared", description: `Sheet shared with ${shareEmail}.` });
     setShareDialogOpen(false);
+  };
+
+  // Handle formula input change
+  const handleFormulaChange = (value: string) => {
+    setFormulaInput(value);
+  };
+
+  // Handle formula submission
+  const handleFormulaSubmit = (rowIndex?: number, colIndex?: number) => {
+    if (!selectedCells || !sheet) return;
+
+    const { startRow, startCol, endRow, endCol } = selectedCells;
+    const targetRow = rowIndex ?? startRow;
+    const targetCol = colIndex ?? startCol;
+
+    updateCell(targetRow, targetCol, formulaInput);
+    setFormulaInput("");
   };
 
   // Handle mouse down on a cell
@@ -536,6 +553,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     tempSheetName,
     titleInputRef,
     spreadsheetTableRef,
+    formulaInput,
 
     // Actions
     updateCell,
@@ -553,6 +571,8 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     handleSave,
     handleExport,
     handleShare,
+    handleFormulaChange,
+    handleFormulaSubmit,
     setTempSheetName,
     setShareDialogOpen,
     setShareEmail,

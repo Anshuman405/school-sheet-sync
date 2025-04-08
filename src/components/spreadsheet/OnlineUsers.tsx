@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useOthers } from "@/providers/LiveblocksProvider";
@@ -13,14 +12,11 @@ const OnlineUsers: React.FC = () => {
         <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm border-2 border-background">
           {user?.firstName ? user.firstName.charAt(0) : user?.username ? user.username.charAt(0) : "U"}
         </div>
-        
-        {/* Show online users from Liveblocks */}
-        {others.map(user => {
-          // Safely handle potentially undefined or non-string values
-          const firstName = typeof user.presence.firstName === 'string' ? user.presence.firstName : '';
+        {others.map((other) => {
+          const firstName = typeof other.presence.firstName === "string" ? other.presence.firstName : "";
           return (
-            <div 
-              key={user.connectionId} 
+            <div
+              key={other.connectionId}
               className="h-8 w-8 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-sm border-2 border-background"
             >
               {firstName ? firstName.charAt(0) : "U"}
@@ -28,7 +24,7 @@ const OnlineUsers: React.FC = () => {
           );
         })}
       </div>
-      <span className="text-sm text-muted-foreground ml-1">
+      <span className="text-sm text-muted-foreground">
         {others.length + 1} {others.length + 1 === 1 ? "editor" : "editors"}
       </span>
     </div>
