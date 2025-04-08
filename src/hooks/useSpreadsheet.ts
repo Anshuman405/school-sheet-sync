@@ -2,7 +2,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
-import { useStorage, useMutation, LiveObject } from "@/providers/LiveblocksProvider";
+import { 
+  useStorage, 
+  useMutation, 
+  LiveObject,
+  SheetData
+} from "@/providers/LiveblocksProvider";
 import { toast } from "@/hooks/use-toast";
 import { isFormula, evaluateFormula } from "@/utils/formulaUtils";
 import { TextAlign } from "@/components/types/spreadsheet";
@@ -37,9 +42,9 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
   // Get sheet data from Liveblocks storage
   const sheet = useStorage((root) => {
-    if (!root || !root.sheets) return undefined;
+    if (!root?.sheets) return undefined;
     const sheetObject = root.sheets.get(sheetId);
-    return sheetObject ? sheetObject.toObject() : undefined;
+    return sheetObject ? sheetObject : undefined;
   });
 
   // Initialize a new sheet or load existing one from Liveblocks
@@ -61,7 +66,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
         Array(50).fill("")
       );
 
-      const newSheet = new LiveObject({
+      const newSheet = new LiveObject<SheetData>({
         name: initialSheetName || "Untitled Sheet",
         data: initialData,
         columns: 50,
@@ -76,9 +81,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
       // Update last accessed timestamp
       const existingSheet = sheets.get(sheetId);
       if (existingSheet) {
-        existingSheet.update({
-          updatedAt: new Date().toISOString()
-        });
+        existingSheet.set("updatedAt", new Date().toISOString());
       }
     }
 
@@ -100,10 +103,8 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     const sheetObj = sheets.get(sheetId);
     
     if (sheetObj) {
-      sheetObj.update({
-        name: newName,
-        updatedAt: new Date().toISOString()
-      });
+      sheetObj.set("name", newName);
+      sheetObj.set("updatedAt", new Date().toISOString());
     }
   }, []);
 
@@ -112,20 +113,20 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!storage) return;
 
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+
     const sheetObj = sheets.get(sheetId);
 
     if (sheetObj) {
-      const currentData = sheetObj.toObject().data;
-      const newData = [...currentData];
+      const currentData = [...sheetObj.get("data")];
       
-      if (newData[rowIndex]) {
-        newData[rowIndex] = [...newData[rowIndex]];
-        newData[rowIndex][colIndex] = value;
+      if (currentData[rowIndex]) {
+        const newRowData = [...currentData[rowIndex]];
+        newRowData[colIndex] = value;
+        currentData[rowIndex] = newRowData;
         
-        sheetObj.update({
-          data: newData,
-          updatedAt: new Date().toISOString()
-        });
+        sheetObj.set("data", currentData);
+        sheetObj.set("updatedAt", new Date().toISOString());
       }
     }
   }, [sheetId]);
@@ -135,21 +136,21 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!storage) return;
 
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+
     const sheetObj = sheets.get(sheetId);
 
     if (sheetObj) {
-      const currentData = sheetObj.toObject().data;
-      const currentColumns = sheetObj.toObject().columns;
+      const currentData = [...sheetObj.get("data")];
+      const currentColumns = sheetObj.get("columns");
       
       const newRow = Array(currentColumns).fill("");
       const newData = [...currentData];
       newData.splice(rowIndex + 1, 0, newRow);
       
-      sheetObj.update({
-        data: newData,
-        rows: sheetObj.toObject().rows + 1,
-        updatedAt: new Date().toISOString()
-      });
+      sheetObj.set("data", newData);
+      sheetObj.set("rows", sheetObj.get("rows") + 1);
+      sheetObj.set("updatedAt", new Date().toISOString());
     }
   }, [sheetId]);
 
@@ -158,21 +159,21 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!storage) return;
 
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+
     const sheetObj = sheets.get(sheetId);
 
     if (sheetObj) {
-      const currentData = sheetObj.toObject().data;
+      const currentData = [...sheetObj.get("data")];
       const newData = currentData.map(row => {
         const newRow = [...row];
         newRow.splice(colIndex + 1, 0, "");
         return newRow;
       });
       
-      sheetObj.update({
-        data: newData,
-        columns: sheetObj.toObject().columns + 1,
-        updatedAt: new Date().toISOString()
-      });
+      sheetObj.set("data", newData);
+      sheetObj.set("columns", sheetObj.get("columns") + 1);
+      sheetObj.set("updatedAt", new Date().toISOString());
     }
   }, [sheetId]);
 
@@ -181,18 +182,18 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!storage) return;
 
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+
     const sheetObj = sheets.get(sheetId);
 
     if (sheetObj) {
-      const currentData = sheetObj.toObject().data;
+      const currentData = [...sheetObj.get("data")];
       const newData = [...currentData];
       newData.splice(rowIndex, 1);
       
-      sheetObj.update({
-        data: newData,
-        rows: sheetObj.toObject().rows - 1,
-        updatedAt: new Date().toISOString()
-      });
+      sheetObj.set("data", newData);
+      sheetObj.set("rows", sheetObj.get("rows") - 1);
+      sheetObj.set("updatedAt", new Date().toISOString());
     }
   }, [sheetId]);
 
@@ -201,21 +202,21 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!storage) return;
 
     const sheets = storage.get("sheets");
+    if (!sheets) return;
+
     const sheetObj = sheets.get(sheetId);
 
     if (sheetObj) {
-      const currentData = sheetObj.toObject().data;
+      const currentData = [...sheetObj.get("data")];
       const newData = currentData.map(row => {
         const newRow = [...row];
         newRow.splice(colIndex, 1);
         return newRow;
       });
       
-      sheetObj.update({
-        data: newData,
-        columns: sheetObj.toObject().columns - 1,
-        updatedAt: new Date().toISOString()
-      });
+      sheetObj.set("data", newData);
+      sheetObj.set("columns", sheetObj.get("columns") - 1);
+      sheetObj.set("updatedAt", new Date().toISOString());
     }
   }, [sheetId]);
 
@@ -225,11 +226,12 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     try {
       const newDisplayedValues: Record<string, string> = {};
+      const data = sheet.get("data");
 
-      sheet.data.forEach((row, rowIndex) => {
-        row.forEach((cellValue, colIndex) => {
+      data.forEach((row: string[], rowIndex: number) => {
+        row.forEach((cellValue: string, colIndex: number) => {
           if (isFormula(cellValue)) {
-            const result = evaluateFormula(cellValue, (r, c) => sheet.data[r]?.[c] || "");
+            const result = evaluateFormula(cellValue, (r, c) => data[r]?.[c] || "");
             newDisplayedValues[`${rowIndex}-${colIndex}`] = result;
           }
         });
@@ -250,7 +252,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     }
 
     if (sheet) {
-      setTempSheetName(sheet.name || "Untitled Sheet");
+      setTempSheetName(sheet.get("name") || "Untitled Sheet");
       recalculateAllFormulas();
       setIsLoading(false);
     }
@@ -266,14 +268,14 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   // Add a new row
   const handleAddRow = () => {
     if (!sheet) return;
-    const rowIndex = sheet.rows - 1;
+    const rowIndex = sheet.get("rows") - 1;
     addRow(rowIndex);
   };
 
   // Add a new column
   const handleAddColumn = () => {
     if (!sheet) return;
-    const colIndex = sheet.columns - 1;
+    const colIndex = sheet.get("columns") - 1;
     addColumn(colIndex);
   };
 
@@ -348,10 +350,12 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     if (!selectedCells || !sheet) return;
 
     const copiedData = [];
+    const data = sheet.get("data");
+    
     for (let row = selectedCells.startRow; row <= selectedCells.endRow; row++) {
       const rowData = [];
       for (let col = selectedCells.startCol; col <= selectedCells.endCol; col++) {
-        rowData.push(sheet.data[row]?.[col] || "");
+        rowData.push(data[row]?.[col] || "");
       }
       copiedData.push(rowData);
     }
@@ -370,30 +374,31 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
       const clipboardData = await navigator.clipboard.readText();
       const rows = clipboardData.split("\n").map((row) => row.split("\t"));
 
-      const currentData = [...sheet.data];
+      const currentData = [...sheet.get("data")];
       rows.forEach((row, rowIndex) => {
         row.forEach((cell, colIndex) => {
           const targetRow = selectedCells.startRow + rowIndex;
           const targetCol = selectedCells.startCol + colIndex;
           if (currentData[targetRow]) {
             if (!currentData[targetRow]) {
-              currentData[targetRow] = [...sheet.data[targetRow]];
+              currentData[targetRow] = [...currentData[targetRow]];
             }
             currentData[targetRow][targetCol] = cell;
           }
         });
       });
 
-      // Use the updateCell mutation for Liveblocks storage
-      const sheets = useStorage.getSnapshot()?.sheets;
-      const sheetObj = sheets?.get(sheetId);
-      
-      if (sheetObj) {
-        sheetObj.update({
-          data: currentData,
-          updatedAt: new Date().toISOString()
-        });
-      }
+      // Update the cell data in storage
+      useMutation(({ storage }) => {
+        if (!storage) return;
+        const sheets = storage.get("sheets");
+        if (!sheets) return;
+        const sheetObj = sheets.get(sheetId);
+        if (sheetObj) {
+          sheetObj.set("data", currentData);
+          sheetObj.set("updatedAt", new Date().toISOString());
+        }
+      })();
       
       toast({ title: "Pasted from clipboard", description: "Data has been pasted into the sheet." });
     } catch (error) {
@@ -412,12 +417,13 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   const handleExport = () => {
     if (!sheet) return;
 
-    const csvContent = sheet.data.map((row) => row.join(",")).join("\n");
+    const data = sheet.get("data");
+    const csvContent = data.map((row: string[]) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `${sheet.name || "sheet"}.csv`);
+    link.setAttribute("download", `${sheet.get("name") || "sheet"}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();

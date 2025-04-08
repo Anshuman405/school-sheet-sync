@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,7 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,7 +82,7 @@ const DashboardContent = () => {
   
   // Get sheets from Liveblocks storage
   const sheets = useStorage(root => {
-    if (!root) return undefined;
+    if (!root?.sheets) return undefined;
     return root.sheets;
   });
   
@@ -129,10 +127,8 @@ const DashboardContent = () => {
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
-      sheet.update({
-        name: newName,
-        updatedAt: new Date().toISOString()
-      });
+      sheet.set("name", newName);
+      sheet.set("updatedAt", new Date().toISOString());
     }
   }, []);
   
@@ -156,12 +152,9 @@ const DashboardContent = () => {
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
-      const sheetData = sheet.toObject();
-      const isStarred = sheetData.starred || false;
-      sheet.update({
-        starred: !isStarred,
-        updatedAt: new Date().toISOString()
-      });
+      const isStarred = sheet.get("starred") || false;
+      sheet.set("starred", !isStarred);
+      sheet.set("updatedAt", new Date().toISOString());
     }
   }, []);
   
@@ -170,13 +163,12 @@ const DashboardContent = () => {
     Array.from(sheets.entries())
       .map(([id, sheetObj]) => {
         try {
-          const sheet = sheetObj.toObject();
           return {
             id,
-            name: sheet.name,
-            updatedAt: sheet.updatedAt,
-            starred: sheet.starred || false,
-            shared: sheet.shared || false
+            name: sheetObj.get("name"),
+            updatedAt: sheetObj.get("updatedAt"),
+            starred: sheetObj.get("starred") || false,
+            shared: sheetObj.get("shared") || false
           };
         } catch (error) {
           console.error(`Error processing sheet ${id}:`, error);
@@ -320,9 +312,7 @@ const DashboardContent = () => {
         try {
           const sheet = sheets.get(sheetId);
           if (sheet) {
-            sheet.update({
-              updatedAt: new Date().toISOString()
-            });
+            sheet.set("updatedAt", new Date().toISOString());
           }
         } catch (error) {
           console.error("Error updating sheet timestamp:", error);

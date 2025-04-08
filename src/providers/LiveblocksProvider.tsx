@@ -48,11 +48,11 @@ export const {
   RoomProvider: LiveblocksRoomProvider,
   useRoom,
   useStorage,
-  useOthers,
-  useSelf,
   useMyPresence,
   useUpdateMyPresence,
   useMutation,
+  useSelf,
+  useOthers,
 } = createRoomContext<Presence, Storage>(client);
 
 // Default initial storage with empty sheets map
