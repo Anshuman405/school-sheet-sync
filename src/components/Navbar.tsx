@@ -88,10 +88,10 @@ export default function Navbar() {
           
           <SignedOut>
             <div className="flex items-center gap-4">
-              <Link to="/login">
+              <Link to="/dashboard">
                 <Button variant="outline">Log in</Button>
               </Link>
-              <Link to="/signup">
+              <Link to="/dashboard">
                 <Button>Sign up</Button>
               </Link>
             </div>
