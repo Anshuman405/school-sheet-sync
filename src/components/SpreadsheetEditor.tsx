@@ -56,7 +56,7 @@ const SpreadsheetEditorContent = ({ sheetId, initialSheetName }: SpreadsheetEdit
     goBack
   } = useSpreadsheet(sheetId, initialSheetName);
   
-  if (isLoading) {
+  if (isLoading || !sheet) {
     return (
       <div className="flex items-center justify-center h-full py-12">
         <div className="text-center">

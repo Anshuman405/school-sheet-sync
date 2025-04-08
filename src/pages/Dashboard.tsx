@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -59,9 +60,9 @@ import {
   useMutation, 
   LiveblocksProvider,
   defaultInitialStorage, 
-  SheetData
+  SheetData,
+  LiveObject
 } from "@/providers/LiveblocksProvider";
-import { LiveObject, LiveList } from "@liveblocks/client";
 
 interface Sheet {
   id: string;
@@ -101,8 +102,8 @@ const DashboardContent = () => {
       Array(50).fill("")
     );
   
-    // Create the sheet object
-    const sheetObj = {
+    // Create the sheet object with LiveObject
+    const sheetObj = new LiveObject<SheetData>({
       name: "Untitled Sheet",
       data: initialData,
       columns: 50,
@@ -110,7 +111,7 @@ const DashboardContent = () => {
       updatedAt: new Date().toISOString(),
       starred: false,
       shared: false,
-    };
+    });
   
     // Add the new sheet to the sheets map
     sheets.set(newId, sheetObj);
@@ -155,7 +156,8 @@ const DashboardContent = () => {
     const sheet = sheets.get(sheetId);
     
     if (sheet) {
-      const isStarred = sheet.get("starred") || false;
+      const sheetData = sheet.toObject();
+      const isStarred = sheetData.starred || false;
       sheet.update({
         starred: !isStarred,
         updatedAt: new Date().toISOString()

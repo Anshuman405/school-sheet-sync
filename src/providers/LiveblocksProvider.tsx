@@ -1,7 +1,10 @@
+
 import { ReactNode } from 'react';
 import { 
   createClient,
   LiveMap,
+  LiveList,
+  LiveObject
 } from '@liveblocks/client';
 import { 
   RoomProvider,
@@ -34,8 +37,11 @@ export type SheetData = {
 
 // Create a type that represents the shared storage for our spreadsheet
 export type Storage = {
-  sheets: LiveMap<string, SheetData>; // Use plain objects for sheets
+  sheets: LiveMap<string, LiveObject<SheetData>>; // Use LiveObject for sheet data
 };
+
+// Export LiveList and LiveObject for use in other files
+export { LiveList, LiveObject };
 
 // Create room context for using Liveblocks
 export const {
