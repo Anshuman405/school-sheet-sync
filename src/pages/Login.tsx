@@ -6,7 +6,8 @@ const SignInPage = () => {
       <SignIn 
         signUpUrl='/signup'
         forceRedirectUrl='/dashboard'
-        routing='hash'
+        path='/login'
+        routing='path'
       />
     </div>
   )
