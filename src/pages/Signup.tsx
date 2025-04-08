@@ -5,7 +5,6 @@ const SignUpPage = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <SignUp 
         signInUrl='/login'
-        forceRedirectUrl='/dashboard'
         path='/signup'
         routing='path'
       />
