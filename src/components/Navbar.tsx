@@ -1,8 +1,7 @@
-
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Route, Routes, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth, useUser, SignedIn, SignedOut } from "@clerk/clerk-react";
 import {
   DropdownMenu,
@@ -12,8 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Features from "./Features";
+import Testimonials from "./Testimonials";
+import CTASection from "./CTASection";
 
-export default function Navbar() {
+export default function Navbar({ scrollToSection }: { scrollToSection: (section: string) => void }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { signOut } = useAuth();
   const { user } = useUser();
@@ -38,15 +40,24 @@ export default function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-6 items-center">
-          <Link to="/features" className="text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => scrollToSection("features")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             Features
-          </Link>
-          <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-            Pricing
-          </Link>
-          <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
-            About
-          </Link>
+          </button>
+          <button
+            onClick={() => scrollToSection("testimonials")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Testimonials
+          </button>
+          <button
+            onClick={() => scrollToSection("cta")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Get Started
+          </button>
           
           <SignedIn>
             <div className="flex items-center gap-4">
@@ -112,13 +123,33 @@ export default function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden border-t border-border">
           <div className="container py-4 flex flex-col gap-4">
-            <Link 
-              to="/features" 
+            <button
+              onClick={() => {
+                scrollToSection("features");
+                setIsMenuOpen(false);
+              }}
               className="py-2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsMenuOpen(false)}
             >
               Features
-            </Link>
+            </button>
+            <button
+              onClick={() => {
+                scrollToSection("testimonials");
+                setIsMenuOpen(false);
+              }}
+              className="py-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Testimonials
+            </button>
+            <button
+              onClick={() => {
+                scrollToSection("cta");
+                setIsMenuOpen(false);
+              }}
+              className="py-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Get Started
+            </button>
             <Link 
               to="/pricing" 
               className="py-2 text-muted-foreground hover:text-foreground transition-colors"
