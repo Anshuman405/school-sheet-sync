@@ -150,20 +150,6 @@ export default function Navbar({ scrollToSection }: { scrollToSection: (section:
             >
               Get Started
             </button>
-            <Link 
-              to="/pricing" 
-              className="py-2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Pricing
-            </Link>
-            <Link 
-              to="/about" 
-              className="py-2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              About
-            </Link>
             
             <SignedIn>
               <div className="flex flex-col gap-3 pt-2">
