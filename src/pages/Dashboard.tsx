@@ -159,17 +159,15 @@ const DashboardContent = () => {
   }, []);
   
   // Filter sheets based on search query and convert to array for rendering
-  const filteredSheets: Sheet[] = sheets ? 
-    Array.from(sheets.entries())
-      .map(([id, sheetObj]) => {
+  const filteredSheets: Sheet[] = sheets
+    ? Array.from(sheets.entries()).map(([id, sheetObj]) => {
         try {
-          return {
-            id,
-            name: sheetObj.get("name"),
-            updatedAt: sheetObj.get("updatedAt"),
-            starred: sheetObj.get("starred") || false,
-            shared: sheetObj.get("shared") || false
-          };
+          const name = sheetObj.name || "Untitled Sheet"; // Fallback to "Untitled Sheet"
+          const updatedAt = sheetObj.updatedAt || new Date().toISOString();
+          const starred = sheetObj.starred || false;
+          const shared = sheetObj.shared || false;
+
+          return { id, name, updatedAt, starred, shared };
         } catch (error) {
           console.error(`Error processing sheet ${id}:`, error);
           return {
@@ -177,11 +175,11 @@ const DashboardContent = () => {
             name: "Error Loading Sheet",
             updatedAt: new Date().toISOString(),
             starred: false,
-            shared: false
+            shared: false,
           };
         }
       })
-      .filter(sheet => sheet.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter((sheet) => sheet.name.toLowerCase().includes(searchQuery.toLowerCase()))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     : [];
   
