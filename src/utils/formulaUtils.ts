@@ -1,3 +1,4 @@
+
 // Basic formula evaluation for spreadsheets
 
 /**
@@ -52,73 +53,47 @@ export const cellRefToIndices = (cellRef: string): { row: number; col: number } 
   return { row, col };
 };
 
-// Dependency graph to track cell references
-const dependencyGraph: Record<string, Set<string>> = {};
-
 /**
- * Update the dependency graph for a cell formula.
+ * Evaluate a formula using the current sheet data
  */
-export const updateDependencies = (cellKey: string, formula: string) => {
-  const refs = extractCellRefs(formula);
-  dependencyGraph[cellKey] = new Set(refs);
-
-  // Remove reverse dependencies for cells no longer referenced
-  for (const key in dependencyGraph) {
-    if (key !== cellKey) {
-      dependencyGraph[key].delete(cellKey);
-    }
-  }
-};
-
-/**
- * Get all dependent cells for a given cell.
- */
-export const getDependents = (cellKey: string): string[] => {
-  const dependents = [];
-  for (const key in dependencyGraph) {
-    if (dependencyGraph[key].has(cellKey)) {
-      dependents.push(key);
-    }
-  }
-  return dependents;
-};
-
-/**
- * Evaluate a formula using the current sheet data and dependency graph.
- */
-export const evaluateFormula = (
-  formula: string,
-  getData: (row: number, col: number) => string
-): string => {
+export const evaluateFormula = (formula: string, getData: (row: number, col: number) => string): string => {
   try {
     if (!isFormula(formula)) {
       return formula;
     }
-
+    
     // Remove the equals sign
     let expression = formula.trim().substring(1);
-
+    
     // Find all cell references
     const cellRefs = extractCellRefs(formula);
-
+    
     // Replace each cell reference with its value
     for (const ref of cellRefs) {
       const { row, col } = cellRefToIndices(ref);
       const cellValue = getData(row, col);
-
+      
       // If the referenced cell is empty or not a number, replace with 0
       const replacementValue = cellValue === "" ? "0" : cellValue;
-
-      // Replace the cell reference with the actual value
-      const regex = new RegExp(`\\b${ref}\\b`, "g");
+      
+      // Replace the cell reference with the actual value - make sure we replace the whole reference
+      // and not just a part of another reference
+      const regex = new RegExp(`\\b${ref}\\b`, 'g');
       expression = expression.replace(regex, replacementValue);
     }
-
-    // Evaluate the expression safely
+    
+    // Evaluate the expression safely using Function
+    // This is a simple approach - in production, you'd want a more robust formula parser
     const result = Function('"use strict";return (' + expression + ')')();
+    
+    // Format the result (handle NaN, Infinity, etc.)
+    if (isNaN(result) || !isFinite(result)) {
+      return "#ERROR!";
+    }
+    
     return result.toString();
   } catch (error) {
-    console.error("Error evaluating formula:", error);
-    return "#ERROR";
+    console.error("Formula evaluation error:", error);
+    return "#ERROR!";
   }
 };

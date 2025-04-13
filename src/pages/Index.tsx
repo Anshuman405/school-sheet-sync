@@ -27,7 +27,7 @@ const Index = () => {
     <div className="flex flex-col min-h-screen">
       <Navbar scrollToSection={scrollToSection} />
       <main className="flex-1">
-        <Hero />
+        <Hero/>
         
         <section className="py-16 md:py-24">
           <div className="container px-4 md:px-6">

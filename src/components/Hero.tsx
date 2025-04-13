@@ -19,9 +19,9 @@ export default function Hero() {
                 Get Started
               </Button>
             </Link>
-            <Link to="/demo">
+            <Link to="/signup">
               <Button size="lg" variant="outline" className="font-medium h-12 px-6">
-                Try Demo
+                Try It Out
               </Button>
             </Link>
           </div>

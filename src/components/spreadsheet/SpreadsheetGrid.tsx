@@ -1,3 +1,4 @@
+
 import React, { CSSProperties } from "react";
 import { isFormula } from "@/utils/formulaUtils";
 import { TextAlign } from "../types/spreadsheet";
@@ -106,10 +107,10 @@ const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
                       >
                         <input 
                           type="text" 
-                          value={isFormula(cellValue) ? displayValue : cellValue} 
+                          value={cellValue} 
                           onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)} 
                           className="w-full h-full bg-transparent border-none outline-none"
-                          placeholder={displayValue}
+                          placeholder={isFormula(cellValue) ? displayValue : ""}
                         />
                         {isFormula(cellValue) && (
                           <div className="absolute bg-background shadow-md rounded p-1 text-xs -mt-6 ml-1">

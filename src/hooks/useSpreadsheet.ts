@@ -8,7 +8,7 @@ import {
   SheetData
 } from "@/providers/LiveblocksProvider";
 import { toast } from "@/hooks/use-toast";
-import { isFormula, evaluateFormula, updateDependencies, getDependents } from "@/utils/formulaUtils";
+import { isFormula, evaluateFormula } from "@/utils/formulaUtils";
 import { TextAlign } from "@/components/types/spreadsheet";
 
 export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
@@ -119,21 +119,14 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     if (sheetObj) {
       const currentData = [...sheetObj.get("data")];
-
+      
       if (currentData[rowIndex]) {
         const newRowData = [...currentData[rowIndex]];
         newRowData[colIndex] = value;
         currentData[rowIndex] = newRowData;
-
+        
         sheetObj.set("data", currentData);
         sheetObj.set("updatedAt", new Date().toISOString());
-
-        // Trigger recalculations
-        const cellKey = `${rowIndex}-${colIndex}`;
-        if (isFormula(value)) {
-          updateDependencies(cellKey, value);
-        }
-        recalculateDependents(cellKey);
       }
     }
   }, [sheetId]);
@@ -227,7 +220,7 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     }
   }, [sheetId]);
 
-  // Recalculate formulas dynamically
+  // Simplify formula recalculation logic
   const recalculateAllFormulas = () => {
     if (!sheet) return;
 
@@ -235,16 +228,11 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
       const newDisplayedValues: Record<string, string> = {};
       const data = sheet.data;
 
-      // Evaluate all formulas
       data.forEach((row: string[], rowIndex: number) => {
         row.forEach((cellValue: string, colIndex: number) => {
-          const cellKey = `${rowIndex}-${colIndex}`;
           if (isFormula(cellValue)) {
             const result = evaluateFormula(cellValue, (r, c) => data[r]?.[c] || "");
-            newDisplayedValues[cellKey] = result;
-
-            // Update dependencies
-            updateDependencies(cellKey, cellValue);
+            newDisplayedValues[`${rowIndex}-${colIndex}`] = result;
           }
         });
       });
@@ -253,22 +241,6 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
     } catch (error) {
       console.error("Error recalculating formulas:", error);
     }
-  };
-
-  // Recalculate formulas for dependent cells
-  const recalculateDependents = (cellKey: string) => {
-    const dependents = getDependents(cellKey);
-    dependents.forEach((dependentKey) => {
-      const [row, col] = dependentKey.split("-").map(Number);
-      const formula = sheet?.data[row]?.[col];
-      if (formula && isFormula(formula)) {
-        const result = evaluateFormula(formula, (r, c) => sheet?.data[r]?.[c] || "");
-        setDisplayedCellValues((prev) => ({
-          ...prev,
-          [dependentKey]: result,
-        }));
-      }
-    });
   };
 
   // Initialize sheet on first render

@@ -17,9 +17,9 @@ export default function CTASection() {
                 Start Free Trial
               </Button>
             </Link>
-            <Link to="/demo">
+            <Link to="/signup">
               <Button size="lg" variant="outline" className="font-medium h-12 px-6 bg-transparent border-primary-foreground/20 hover:bg-primary-foreground/10">
-                Schedule a Demo
+                Try It Out
               </Button>
             </Link>
           </div>
