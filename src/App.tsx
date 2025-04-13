@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
+import { Analytics } from '@vercel/analytics/next';
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <Analytics />
       <ClerkLoaded>
         <LiveblocksProvider roomId="default-room" initialStorage={defaultInitialStorage}>
           <BrowserRouter>
@@ -106,6 +108,7 @@ const App = () => (
       </ClerkLoaded>
     </TooltipProvider>
   </QueryClientProvider>
+  
 );
 
 export default App;
