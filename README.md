@@ -9,6 +9,9 @@ Check out the live website here:
 
 ## 🔗 GitHub
 
+Link to Repository: 
+🔗 https://github.com/Anshuman405/school-sheet-sync
+
 Clone the project:
 
 ```bash
@@ -55,3 +58,6 @@ cd school-sheet-sync
   Each user's data is securely stored and separated.
 
 ---
+
+
+
