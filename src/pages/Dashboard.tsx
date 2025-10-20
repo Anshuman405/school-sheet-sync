@@ -309,7 +309,7 @@ const DashboardContent = () => {
       if (sheetId && sheets && sheets.has(sheetId)) {
         try {
           const sheet = sheets.get(sheetId);
-          if (sheet) {
+          if (sheet && typeof sheet === 'object' && 'set' in sheet && typeof sheet.set === 'function') {
             sheet.set("updatedAt", new Date().toISOString());
           }
         } catch (error) {
@@ -394,8 +394,7 @@ const DashboardContent = () => {
         {sheetId ? (
           // Show spreadsheet editor when a sheet is selected
           <SpreadsheetEditor 
-            sheetId={sheetId} 
-            initialSheetName={filteredSheets.find(s => s.id === sheetId)?.name}
+            sheetId={sheetId}
           />
         ) : (
           <div className="space-y-6">

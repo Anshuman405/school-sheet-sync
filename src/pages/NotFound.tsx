@@ -5,9 +5,11 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const NotFound = () => {
+  const scrollToSection = () => {};
+  
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar />
+      <Navbar scrollToSection={scrollToSection} />
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <h1 className="text-5xl font-bold text-primary mb-6">404</h1>

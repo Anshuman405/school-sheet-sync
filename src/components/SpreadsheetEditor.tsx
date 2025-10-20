@@ -109,7 +109,6 @@ const SpreadsheetEditor: React.FC<{ sheetId: string }> = ({ sheetId }) => {
         onCellMouseOver={handleCellMouseOver}
         onCellMouseUp={handleCellMouseUp}
         updateCell={updateCell}
-        onFormulaSubmit={handleFormulaSubmit}
       />
     </SpreadsheetLayout>
   );
