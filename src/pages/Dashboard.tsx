@@ -12,7 +12,9 @@ import {
   Star,
   Trash2,
   Edit,
-  ListFilter
+  ListFilter,
+  FileText,
+  Table as TableIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import SpreadsheetEditor from "@/components/SpreadsheetEditor";
+import DocumentEditor from "@/components/DocumentEditor";
 import { 
   useRoom, 
   useStorage, 
@@ -68,6 +71,7 @@ interface Sheet {
   updatedAt: string;
   starred?: boolean;
   shared?: boolean;
+  type?: 'spreadsheet' | 'document';
 }
 
 const DashboardContent = () => {
@@ -79,6 +83,7 @@ const DashboardContent = () => {
   const [sheetToRename, setSheetToRename] = useState<{ id: string, name: string } | null>(null);
   const [newSheetName, setNewSheetName] = useState("");
   const [sheetToDelete, setSheetToDelete] = useState<string | null>(null);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   
   // Get sheets from Liveblocks storage
   const sheets = useStorage(root => {
@@ -87,32 +92,45 @@ const DashboardContent = () => {
   });
   
   // Create a new sheet
-  const createNewSheet = useMutation(({ storage }) => {
+  const createNewSheet = useMutation(({ storage }, type: 'spreadsheet' | 'document' = 'spreadsheet') => {
     if (!storage) return null;
   
     const sheets = storage.get("sheets");
     if (!sheets) return null;
   
-    const newId = `sheet-${Date.now()}`;
+    const newId = `${type}-${Date.now()}`;
   
-    // Create initial rows as a 2D array
-    const initialData = Array.from({ length: 100 }, () =>
-      Array(50).fill("")
-    );
+    if (type === 'spreadsheet') {
+      // Create initial rows as a 2D array
+      const initialData = Array.from({ length: 100 }, () =>
+        Array(50).fill("")
+      );
   
-    // Create the sheet object with LiveObject
-    const sheetObj = new LiveObject<SheetData>({
-      name: "Untitled Sheet",
-      data: initialData,
-      columns: 50,
-      rows: 100,
-      updatedAt: new Date().toISOString(),
-      starred: false,
-      shared: false,
-    });
+      // Create the sheet object with LiveObject
+      const sheetObj = new LiveObject<SheetData>({
+        name: "Untitled Sheet",
+        data: initialData,
+        columns: 50,
+        rows: 100,
+        updatedAt: new Date().toISOString(),
+        starred: false,
+        shared: false,
+      });
   
-    // Add the new sheet to the sheets map
-    sheets.set(newId, sheetObj);
+      // Add the new sheet to the sheets map
+      sheets.set(newId, sheetObj);
+    } else {
+      // Create a document
+      const docObj = new LiveObject({
+        name: "Untitled Document",
+        content: "",
+        updatedAt: new Date().toISOString(),
+        starred: false,
+        shared: false,
+      });
+      
+      sheets.set(newId, docObj);
+    }
   
     return newId;
   }, []);
@@ -201,24 +219,25 @@ const DashboardContent = () => {
     }
   };
   
-  const handleCreateNewSheet = () => {
+  const handleCreateNewSheet = (type: 'spreadsheet' | 'document' = 'spreadsheet') => {
     try {
-      const newId = createNewSheet();
+      const newId = createNewSheet(type);
       if (newId) {
         navigate(`/sheets/${newId}`);
+        setCreateMenuOpen(false);
         
         toast({
-          title: "New sheet created",
-          description: "Your new spreadsheet is ready to edit.",
+          title: type === 'spreadsheet' ? "New spreadsheet created" : "New document created",
+          description: `Your new ${type} is ready to edit.`,
         });
       } else {
-        throw new Error("Failed to create new sheet");
+        throw new Error(`Failed to create new ${type}`);
       }
     } catch (error) {
-      console.error("Error creating sheet:", error);
+      console.error(`Error creating ${type}:`, error);
       toast({
         title: "Error",
-        description: "Failed to create a new sheet. Please try again.",
+        description: `Failed to create a new ${type}. Please try again.`,
         variant: "destructive",
       });
     }
@@ -347,9 +366,23 @@ const DashboardContent = () => {
           </div>
           
           <div className="flex items-center gap-4">
-            <Button onClick={handleCreateNewSheet} size="sm">
-              <Plus className="mr-1 h-4 w-4" /> New Sheet
-            </Button>
+            <DropdownMenu open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  <Plus className="mr-1 h-4 w-4" /> New
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleCreateNewSheet('spreadsheet')}>
+                  <TableIcon className="h-4 w-4 mr-2" />
+                  Spreadsheet
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCreateNewSheet('document')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Document
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* User dropdown from Clerk */}
             <DropdownMenu>
@@ -392,10 +425,12 @@ const DashboardContent = () => {
       
       <main className="flex-1 container py-6">
         {sheetId ? (
-          // Show spreadsheet editor when a sheet is selected
-          <SpreadsheetEditor 
-            sheetId={sheetId}
-          />
+          // Show editor based on type
+          sheetId.startsWith('document-') ? (
+            <DocumentEditor docId={sheetId} />
+          ) : (
+            <SpreadsheetEditor sheetId={sheetId} />
+          )
         ) : (
           <div className="space-y-6">
             <div className="flex items-center justify-between">

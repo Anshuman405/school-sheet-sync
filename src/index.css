@@ -32,6 +32,16 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
  
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --spreadsheet-header: 210 20% 98%;
+    --spreadsheet-selected: 221.2 83.2% 95%;
+    --spreadsheet-hover: 210 20% 96%;
+    
     --radius: 0.5rem;
   }
  
@@ -63,6 +73,10 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+    
+    --spreadsheet-header: 217.2 32.6% 20%;
+    --spreadsheet-selected: 217.2 91.2% 25%;
+    --spreadsheet-hover: 217.2 32.6% 22%;
   }
 }
  
@@ -75,31 +89,69 @@
   }
 }
 
-/* Spreadsheet styles */
+/* Enhanced Spreadsheet Styles */
 .spreadsheet-grid {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .spreadsheet-header {
-  @apply bg-muted/50 text-muted-foreground font-medium text-sm px-3 py-2 text-center sticky top-0 z-10;
+  @apply bg-[hsl(var(--spreadsheet-header))] text-muted-foreground font-semibold text-xs px-3 py-2.5 text-center sticky top-0 z-10 border-b border-r border-border;
   min-width: 6rem;
+  transition: background-color 0.2s ease;
+}
+
+.spreadsheet-header:hover {
+  @apply bg-[hsl(var(--spreadsheet-hover))];
 }
 
 .spreadsheet-row-header {
-  @apply bg-muted/50 text-muted-foreground font-medium text-sm px-2 py-1 text-center sticky left-0 z-10;
+  @apply bg-[hsl(var(--spreadsheet-header))] text-muted-foreground font-semibold text-xs px-3 py-2 text-center sticky left-0 z-10 border-r border-b border-border;
+  transition: background-color 0.2s ease;
+}
+
+.spreadsheet-row-header:hover {
+  @apply bg-[hsl(var(--spreadsheet-hover))];
 }
 
 .spreadsheet-cell {
-  @apply px-2 py-1 border border-border outline-none focus:ring-1 focus:ring-primary/50;
-  height: 2rem;
+  @apply px-2 py-1.5 border-r border-b border-border outline-none transition-all duration-150;
+  height: 2.25rem;
+  min-width: 6rem;
+}
+
+.spreadsheet-cell:hover {
+  @apply bg-[hsl(var(--spreadsheet-hover))];
+}
+
+.spreadsheet-cell:focus-within {
+  @apply ring-2 ring-primary/50 bg-background;
+  z-index: 5;
+}
+
+.spreadsheet-cell.selected {
+  @apply bg-[hsl(var(--spreadsheet-selected))] ring-1 ring-primary;
 }
 
 .spreadsheet-toolbar {
-  @apply flex items-center gap-2 p-2 bg-background border-b;
+  @apply flex items-center gap-2 p-3 bg-background border-b shadow-sm;
 }
 
 .spreadsheet-toolbar button {
-  @apply text-sm px-3 py-1;
+  @apply text-sm px-3 py-1.5 transition-all duration-200;
+}
+
+/* Formula Bar Styles */
+.formula-bar {
+  @apply flex items-center gap-3 p-2.5 bg-[hsl(var(--spreadsheet-header))] border-b border-border;
+}
+
+.formula-bar-label {
+  @apply text-xs font-semibold text-muted-foreground uppercase tracking-wide;
+}
+
+.formula-bar-input {
+  @apply flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-primary/50 transition-all;
 }
 
 /* Fixed column headers */
@@ -122,4 +174,65 @@
   left: 0;
   top: 0;
   z-index: 30;
+}
+
+/* Document Editor Styles */
+.doc-editor {
+  @apply min-h-screen bg-muted/30;
+}
+
+.doc-editor-toolbar {
+  @apply sticky top-0 z-40 bg-background border-b shadow-sm;
+}
+
+.doc-editor-content {
+  @apply max-w-4xl mx-auto my-8 bg-background shadow-lg rounded-lg;
+  min-height: 11in;
+  padding: 1in;
+}
+
+.doc-editor-page {
+  @apply prose prose-slate max-w-none;
+}
+
+/* Rich text editor content */
+.ProseMirror {
+  @apply outline-none min-h-[11in];
+}
+
+.ProseMirror p {
+  @apply mb-3;
+}
+
+.ProseMirror h1 {
+  @apply text-3xl font-bold mb-4 mt-6;
+}
+
+.ProseMirror h2 {
+  @apply text-2xl font-bold mb-3 mt-5;
+}
+
+.ProseMirror h3 {
+  @apply text-xl font-bold mb-2 mt-4;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  @apply pl-6 mb-3;
+}
+
+.ProseMirror blockquote {
+  @apply border-l-4 border-primary pl-4 italic my-4;
+}
+
+.ProseMirror code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.ProseMirror pre {
+  @apply bg-muted p-4 rounded-lg overflow-x-auto mb-4;
+}
+
+.ProseMirror pre code {
+  @apply bg-transparent p-0;
 }

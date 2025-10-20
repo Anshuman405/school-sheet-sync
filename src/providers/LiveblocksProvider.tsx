@@ -35,9 +35,30 @@ export type SheetData = {
   shared?: boolean;
 };
 
+// Document object type
+export type DocumentData = {
+  name: string;
+  content: string;
+  updatedAt: string;
+  starred?: boolean;
+  shared?: boolean;
+};
+
+// Union type for all items
+export type ItemData = SheetData | DocumentData;
+
+// Type guards
+export const isSheetData = (item: ItemData): item is SheetData => {
+  return 'data' in item && 'columns' in item && 'rows' in item;
+};
+
+export const isDocumentData = (item: ItemData): item is DocumentData => {
+  return 'content' in item && !('data' in item);
+};
+
 // Create a type that represents the shared storage for our spreadsheet
 export type Storage = {
-  sheets: LiveMap<string, LiveObject<SheetData>>; // Use LiveObject for sheet data
+  sheets: LiveMap<string, LiveObject<ItemData>>; // Use LiveObject for items (sheets or documents)
 };
 
 // Export LiveList and LiveObject for use in other files

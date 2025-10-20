@@ -5,7 +5,8 @@ import {
   useStorage, 
   useMutation, 
   LiveObject,
-  SheetData
+  SheetData,
+  isSheetData
 } from "@/providers/LiveblocksProvider";
 import { toast } from "@/hooks/use-toast";
 import { isFormula, evaluateFormula } from "@/utils/formulaUtils";
@@ -44,7 +45,13 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   const sheet = useStorage((root) => {
     if (!root?.sheets) return undefined;
     const sheetObject = root.sheets.get(sheetId);
-    return sheetObject ? sheetObject : undefined;
+    if (!sheetObject) return undefined;
+    
+    // Type guard to ensure it's a spreadsheet
+    const data = sheetObject;
+    if (!isSheetData(data)) return undefined;
+    
+    return data as SheetData;
   });
 
   // Initialize a new sheet or load existing one from Liveblocks
@@ -117,16 +124,16 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     const sheetObj = sheets.get(sheetId);
 
-    if (sheetObj) {
-      const currentData = [...sheetObj.get("data")];
+    if (sheetObj && isSheetData(sheetObj.toObject())) {
+      const objData = sheetObj.toObject() as SheetData;
+      const currentData = [...objData.data];
       
       if (currentData[rowIndex]) {
         const newRowData = [...currentData[rowIndex]];
         newRowData[colIndex] = value;
         currentData[rowIndex] = newRowData;
         
-        sheetObj.set("data", currentData);
-        sheetObj.set("updatedAt", new Date().toISOString());
+        sheetObj.update({ data: currentData, updatedAt: new Date().toISOString() });
       }
     }
   }, [sheetId]);
@@ -140,17 +147,21 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     const sheetObj = sheets.get(sheetId);
 
-    if (sheetObj) {
-      const currentData = [...sheetObj.get("data")];
-      const currentColumns = sheetObj.get("columns");
+    if (sheetObj && isSheetData(sheetObj.toObject())) {
+      const objData = sheetObj.toObject() as SheetData;
+      const currentData = [...objData.data];
+      const currentColumns = objData.columns;
+      const currentRows = objData.rows;
       
       const newRow = Array(currentColumns).fill("");
       const newData = [...currentData];
       newData.splice(rowIndex + 1, 0, newRow);
       
-      sheetObj.set("data", newData);
-      sheetObj.set("rows", sheetObj.get("rows") + 1);
-      sheetObj.set("updatedAt", new Date().toISOString());
+      sheetObj.update({ 
+        data: newData, 
+        rows: currentRows + 1, 
+        updatedAt: new Date().toISOString() 
+      });
     }
   }, [sheetId]);
 
@@ -163,17 +174,22 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     const sheetObj = sheets.get(sheetId);
 
-    if (sheetObj) {
-      const currentData = [...sheetObj.get("data")];
+    if (sheetObj && isSheetData(sheetObj.toObject())) {
+      const objData = sheetObj.toObject() as SheetData;
+      const currentData = [...objData.data];
+      const currentColumns = objData.columns;
+      
       const newData = currentData.map(row => {
         const newRow = [...row];
         newRow.splice(colIndex + 1, 0, "");
         return newRow;
       });
       
-      sheetObj.set("data", newData);
-      sheetObj.set("columns", sheetObj.get("columns") + 1);
-      sheetObj.set("updatedAt", new Date().toISOString());
+      sheetObj.update({ 
+        data: newData, 
+        columns: currentColumns + 1, 
+        updatedAt: new Date().toISOString() 
+      });
     }
   }, [sheetId]);
 
@@ -186,14 +202,18 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     const sheetObj = sheets.get(sheetId);
 
-    if (sheetObj) {
-      const currentData = [...sheetObj.get("data")];
+    if (sheetObj && isSheetData(sheetObj.toObject())) {
+      const objData = sheetObj.toObject() as SheetData;
+      const currentData = [...objData.data];
+      const currentRows = objData.rows;
       const newData = [...currentData];
       newData.splice(rowIndex, 1);
       
-      sheetObj.set("data", newData);
-      sheetObj.set("rows", sheetObj.get("rows") - 1);
-      sheetObj.set("updatedAt", new Date().toISOString());
+      sheetObj.update({ 
+        data: newData, 
+        rows: currentRows - 1, 
+        updatedAt: new Date().toISOString() 
+      });
     }
   }, [sheetId]);
 
@@ -206,17 +226,22 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
 
     const sheetObj = sheets.get(sheetId);
 
-    if (sheetObj) {
-      const currentData = [...sheetObj.get("data")];
+    if (sheetObj && isSheetData(sheetObj.toObject())) {
+      const objData = sheetObj.toObject() as SheetData;
+      const currentData = [...objData.data];
+      const currentColumns = objData.columns;
+      
       const newData = currentData.map(row => {
         const newRow = [...row];
         newRow.splice(colIndex, 1);
         return newRow;
       });
       
-      sheetObj.set("data", newData);
-      sheetObj.set("columns", sheetObj.get("columns") - 1);
-      sheetObj.set("updatedAt", new Date().toISOString());
+      sheetObj.update({ 
+        data: newData, 
+        columns: currentColumns - 1, 
+        updatedAt: new Date().toISOString() 
+      });
     }
   }, [sheetId]);
 
@@ -394,9 +419,8 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
         const sheets = storage.get("sheets");
         if (!sheets) return;
         const sheetObj = sheets.get(sheetId);
-        if (sheetObj) {
-          sheetObj.set("data", currentData);
-          sheetObj.set("updatedAt", new Date().toISOString());
+        if (sheetObj && isSheetData(sheetObj.toObject())) {
+          sheetObj.update({ data: currentData, updatedAt: new Date().toISOString() });
         }
       }, [sheetId, currentData])
       
@@ -450,14 +474,12 @@ export const useSpreadsheet = (sheetId: string, initialSheetName?: string) => {
   };
 
   // Handle formula submission
-  const handleFormulaSubmit = (rowIndex?: number, colIndex?: number) => {
+  const handleFormulaSubmit = (formula: string) => {
     if (!selectedCells || !sheet) return;
 
-    const { startRow, startCol, endRow, endCol } = selectedCells;
-    const targetRow = rowIndex ?? startRow;
-    const targetCol = colIndex ?? startCol;
+    const { startRow, startCol } = selectedCells;
 
-    updateCell(targetRow, targetCol, formulaInput);
+    updateCell(startRow, startCol, formula);
     setFormulaInput("");
   };
 

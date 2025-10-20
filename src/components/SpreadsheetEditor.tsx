@@ -5,6 +5,7 @@ import SpreadsheetGrid from "./spreadsheet/SpreadsheetGrid";
 import OnlineUsers from "./spreadsheet/OnlineUsers";
 import SpreadsheetLayout from "./spreadsheet/SpreadsheetLayout";
 import SpreadsheetTitle from "./spreadsheet/SpreadsheetTitle";
+import FormulaBar from "./spreadsheet/FormulaBar";
 
 const SpreadsheetEditor: React.FC<{ sheetId: string }> = ({ sheetId }) => {
   const {
@@ -65,6 +66,16 @@ const SpreadsheetEditor: React.FC<{ sheetId: string }> = ({ sheetId }) => {
         onTitleKeyDown={handleTitleKeyDown}
       />
       <OnlineUsers />
+      
+      {/* Formula Bar */}
+      <FormulaBar
+        selectedCellValue={selectedCells ? (sheet?.data?.[selectedCells.startRow]?.[selectedCells.startCol] || "") : ""}
+        selectedCellDisplay={selectedCells ? (displayedCellValues[`${selectedCells.startRow}-${selectedCells.startCol}`] || "") : ""}
+        selectedCell={selectedCells ? { row: selectedCells.startRow, col: selectedCells.startCol } : null}
+        onFormulaSubmit={(formula) => handleFormulaSubmit(formula)}
+        onCancel={() => {}}
+      />
+      
       <SpreadsheetToolbar
         sheetName={sheet.name}
         isEditingTitle={isEditingTitle}
@@ -95,7 +106,7 @@ const SpreadsheetEditor: React.FC<{ sheetId: string }> = ({ sheetId }) => {
         onShare={handleShare}
         formulaInput={formulaInput}
         onFormulaChange={handleFormulaChange}
-        onFormulaSubmit={handleFormulaSubmit}
+        onFormulaSubmit={() => handleFormulaSubmit(formulaInput)}
       />
       <SpreadsheetGrid
         spreadsheetTableRef={spreadsheetTableRef}
